@@ -1,0 +1,291 @@
+*Edit Profile*
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Edit Profile</title>
+
+<style>
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Poppins',sans-serif;
+}
+
+body{
+    background:#050816;
+    color:#fff;
+    overflow-x:hidden;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:40px 20px;
+}
+
+/* Animated Background */
+
+body::before,
+body::after{
+    content:'';
+    position:absolute;
+    width:350px;
+    height:350px;
+    border-radius:50%;
+    filter:blur(100px);
+    z-index:-1;
+    animation:float 8s infinite ease-in-out;
+}
+
+body::before{
+    background:#00ffcc;
+    top:-100px;
+    left:-100px;
+}
+
+body::after{
+    background:#6c63ff;
+    bottom:-100px;
+    right:-100px;
+    animation-delay:3s;
+}
+
+@keyframes float{
+    0%,100%{
+        transform:translateY(0px);
+    }
+    50%{
+        transform:translateY(35px);
+    }
+}
+
+/* MAIN CARD */
+
+.container{
+    width:100%;
+    max-width:500px;
+    background:rgba(255,255,255,0.05);
+    border:1px solid rgba(255,255,255,0.1);
+    backdrop-filter:blur(15px);
+    border-radius:30px;
+    padding:40px;
+    animation:fadeIn 1s ease;
+    box-shadow:0 0 30px rgba(0,0,0,0.3);
+}
+
+@keyframes fadeIn{
+    from{
+        opacity:0;
+        transform:translateY(30px);
+    }
+    to{
+        opacity:1;
+        transform:translateY(0);
+    }
+}
+
+.container h2{
+    text-align:center;
+    margin-bottom:30px;
+    font-size:34px;
+    color:#00ffcc;
+    text-shadow:0 0 15px rgba(0,255,204,0.5);
+}
+
+/* PROFILE IMAGE */
+
+.profile-section{
+    text-align:center;
+    margin-bottom:30px;
+}
+
+.profile-img{
+    width:120px;
+    height:120px;
+    border-radius:50%;
+    background:linear-gradient(135deg,#00ffcc,#6c63ff);
+    margin:auto;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-size:45px;
+    font-weight:bold;
+    color:#000;
+    box-shadow:0 0 25px rgba(0,255,204,0.5);
+    margin-bottom:18px;
+    animation:pulse 3s infinite;
+}
+
+@keyframes pulse{
+    0%,100%{
+        transform:scale(1);
+    }
+    50%{
+        transform:scale(1.05);
+    }
+}
+
+.upload-btn{
+    display:inline-block;
+    padding:10px 22px;
+    border-radius:14px;
+    background:#00ffcc;
+    color:#000;
+    font-weight:bold;
+    cursor:pointer;
+    transition:0.3s;
+}
+
+.upload-btn:hover{
+    transform:translateY(-3px);
+    box-shadow:0 0 20px rgba(0,255,204,0.5);
+}
+
+/* INPUTS */
+
+.input-box{
+    margin-bottom:20px;
+}
+
+.input-box input,
+.input-box select,
+.input-box textarea{
+    width:100%;
+    padding:15px;
+    border:none;
+    outline:none;
+    border-radius:16px;
+    background:rgba(255,255,255,0.07);
+    border:1px solid rgba(255,255,255,0.08);
+    color:#fff;
+    font-size:15px;
+    transition:0.3s;
+}
+
+.input-box textarea{
+    resize:none;
+    height:100px;
+}
+
+.input-box input:focus,
+.input-box select:focus,
+.input-box textarea:focus{
+    border-color:#00ffcc;
+    box-shadow:0 0 15px rgba(0,255,204,0.3);
+    transform:scale(1.02);
+}
+
+.input-box input::placeholder,
+.input-box textarea::placeholder{
+    color:#9ca3af;
+}
+
+.input-box select{
+    appearance:none;
+    cursor:pointer;
+}
+
+.input-box select option{
+    color:#000;
+}
+
+/* BUTTON */
+
+.save-btn{
+    width:100%;
+    padding:16px;
+    border:none;
+    border-radius:18px;
+    background:linear-gradient(135deg,#00ffcc,#6c63ff);
+    color:#000;
+    font-size:18px;
+    font-weight:bold;
+    cursor:pointer;
+    transition:0.4s;
+    margin-top:10px;
+}
+
+.save-btn:hover{
+    transform:translateY(-5px);
+    box-shadow:0 0 30px rgba(0,255,204,0.4);
+}
+
+/* RESPONSIVE */
+
+@media(max-width:600px){
+
+    .container{
+        padding:30px 20px;
+    }
+
+    .container h2{
+        font-size:28px;
+    }
+
+}
+
+</style>
+</head>
+<body>
+
+<div class="container">
+
+    <h2>Edit Profile</h2>
+
+    <!-- PROFILE IMAGE -->
+
+    <div class="profile-section">
+
+        <div class="profile-img">
+            A
+        </div>
+
+        <label class="upload-btn">
+            Upload Photo
+        </label>
+
+    </div>
+
+    <!-- FORM -->
+
+    <div class="input-box">
+        <input type="text" placeholder="Full Name">
+    </div>
+
+    <div class="input-box">
+        <input type="email" placeholder="Email Address">
+    </div>
+
+    <div class="input-box">
+        <input type="tel" placeholder="Phone Number">
+    </div>
+
+    <div class="input-box">
+        <input type="number" placeholder="Age">
+    </div>
+
+    <div class="input-box">
+        <select>
+            <option selected disabled>Select Gender</option>
+            <option>Male</option>
+            <option>Female</option>
+            <option>Other</option>
+        </select>
+    </div>
+
+    <div class="input-box">
+        <textarea placeholder="Write your bio..."></textarea>
+    </div>
+
+    <button class="save-btn">
+        Save Changes
+    </button>
+
+</div>
+
+</body>
+</html>

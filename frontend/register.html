@@ -1,0 +1,232 @@
+*Register Page*
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beautiful Register Page</title>
+
+    <style>
+
+        *{
+            margin:0;
+            padding:0;
+            box-sizing:border-box;
+            font-family:'Poppins',sans-serif;
+        }
+
+        body{
+            height:100vh;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            background:linear-gradient(135deg,#ff512f,#dd2476);
+            overflow:hidden;
+        }
+
+        /* Floating Background */
+        body::before,
+        body::after{
+            content:'';
+            position:absolute;
+            border-radius:50%;
+            background:rgba(255,255,255,0.12);
+            animation:float 6s infinite ease-in-out;
+        }
+
+        body::before{
+            width:250px;
+            height:250px;
+            top:-80px;
+            left:-80px;
+        }
+
+        body::after{
+            width:320px;
+            height:320px;
+            bottom:-120px;
+            right:-100px;
+            animation-delay:2s;
+        }
+
+        @keyframes float{
+            0%,100%{
+                transform:translateY(0px);
+            }
+            50%{
+                transform:translateY(20px);
+            }
+        }
+
+        /* Glassmorphism Card */
+        .container{
+            width:420px;
+            padding:40px;
+            border-radius:25px;
+            background:rgba(255,255,255,0.15);
+            backdrop-filter:blur(15px);
+            border:1px solid rgba(255,255,255,0.2);
+            box-shadow:0 8px 32px rgba(0,0,0,0.25);
+            animation:fadeIn 1s ease;
+        }
+
+        @keyframes fadeIn{
+            from{
+                opacity:0;
+                transform:translateY(40px);
+            }
+            to{
+                opacity:1;
+                transform:translateY(0);
+            }
+        }
+
+        .container h2{
+            text-align:center;
+            color:#fff;
+            margin-bottom:30px;
+            font-size:34px;
+            letter-spacing:1px;
+        }
+
+        .input-box{
+            margin-bottom:20px;
+        }
+
+        .input-box input,
+        .input-box select{
+            width:100%;
+            padding:14px 15px;
+            border:none;
+            outline:none;
+            border-radius:14px;
+            background:rgba(255,255,255,0.2);
+            color:#fff;
+            font-size:16px;
+            transition:0.3s;
+            appearance:none;
+        }
+
+        .input-box input::placeholder{
+            color:#eee;
+        }
+
+        .input-box select{
+            cursor:pointer;
+        }
+
+        .input-box select option{
+            color:#000;
+        }
+
+        .input-box input:focus,
+        .input-box select:focus{
+            background:rgba(255,255,255,0.3);
+            transform:scale(1.02);
+        }
+
+        /* Custom Dropdown Arrow */
+        .select-box{
+            position:relative;
+        }
+
+        .select-box::after{
+            content:"▼";
+            position:absolute;
+            right:18px;
+            top:50%;
+            transform:translateY(-50%);
+            color:#fff;
+            pointer-events:none;
+            font-size:14px;
+        }
+
+        .register-btn{
+            width:100%;
+            padding:15px;
+            border:none;
+            border-radius:14px;
+            background:#fff;
+            color:#dd2476;
+            font-size:18px;
+            font-weight:bold;
+            cursor:pointer;
+            transition:0.3s;
+            margin-top:10px;
+        }
+
+        .register-btn:hover{
+            transform:translateY(-3px);
+            box-shadow:0 10px 20px rgba(0,0,0,0.25);
+        }
+
+        .login-link{
+            text-align:center;
+            margin-top:22px;
+            color:#fff;
+        }
+
+        .login-link a{
+            color:#fff;
+            text-decoration:none;
+            font-weight:600;
+            border:1px solid rgba(255,255,255,0.4);
+            padding:10px 20px;
+            border-radius:12px;
+            display:inline-block;
+            margin-top:10px;
+            transition:0.3s;
+        }
+
+        .login-link a:hover{
+            background:#fff;
+            color:#dd2476;
+            transform:scale(1.05);
+        }
+
+    </style>
+
+</head>
+<body>
+
+    <div class="container">
+
+        <h2>Create Account</h2>
+
+        <div class="input-box">
+            <input type="text" placeholder="Full Name">
+        </div>
+
+        <div class="input-box">
+            <input type="email" placeholder="Email Address">
+        </div>
+
+        <div class="input-box">
+            <input type="tel" placeholder="Phone Number">
+        </div>
+
+        <div class="input-box">
+            <input type="number" placeholder="Age">
+        </div>
+
+        <div class="input-box select-box">
+            <select>
+                <option selected disabled>Select Gender</option>
+                <option>Male</option>
+                <option>Female</option>
+                <option>Other</option>
+            </select>
+        </div>
+
+        <button class="register-btn">Create Account</button>
+
+        <div class="login-link">
+            <p>Already have an account?</p>
+            <a href="#">Login</a>
+        </div>
+
+    </div>
+
+</body>
+</html>
