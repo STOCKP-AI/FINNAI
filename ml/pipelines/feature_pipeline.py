@@ -1,5 +1,6 @@
 import pandas as pd
 import psycopg2
+from psycopg2.extras import execute_values
 from dotenv import load_dotenv
 import os
 import numpy as np
@@ -79,10 +80,7 @@ print(f"Feature rows: {len(df)}")
 
 cur = conn.cursor()
 
-# Clear old features
-cur.execute("DELETE FROM features;")
-
-# Insert new features
+# Upsert features incrementally by date
 insert_query = """
 INSERT INTO features (
     date,
@@ -96,13 +94,22 @@ INSERT INTO features (
     bb_width,
     fii_flow
 )
-VALUES (
-    %s,%s,%s,%s,%s,%s,%s,%s,%s,%s
-);
+VALUES %s
+ON CONFLICT (date) DO UPDATE SET
+    volatility_20d = EXCLUDED.volatility_20d,
+    sharpe_60d = EXCLUDED.sharpe_60d,
+    autocorr_lag1 = EXCLUDED.autocorr_lag1,
+    vix_level = EXCLUDED.vix_level,
+    vix_change_30d = EXCLUDED.vix_change_30d,
+    drawdown_60d = EXCLUDED.drawdown_60d,
+    skewness_30d = EXCLUDED.skewness_30d,
+    bb_width = EXCLUDED.bb_width,
+    fii_flow = EXCLUDED.fii_flow;
 """
 
+rows = []
 for _, row in df.iterrows():
-    cur.execute(insert_query, (
+    rows.append((
         row["date"],
         float(row["volatility_20d"]),
         float(row["sharpe_60d"]),
@@ -115,9 +122,12 @@ for _, row in df.iterrows():
         float(row["fii_flow"])
     ))
 
-conn.commit()
-
-print("Features inserted successfully!")
+if rows:
+    execute_values(cur, insert_query, rows)
+    conn.commit()
+    print("Features upserted successfully!")
+else:
+    print("No feature rows to upsert.")
 
 cur.close()
 conn.close()

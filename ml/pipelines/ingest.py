@@ -75,6 +75,13 @@ print(f"Rows fetched: {len(df)}")
 # Prepare rows
 rows = []
 
+# Save downloaded CSVs for inspection/backup
+os.makedirs("data", exist_ok=True)
+nifty.to_csv(os.path.join("data", "nifty.csv"), index=False)
+vix.to_csv(os.path.join("data", "vix.csv"), index=False)
+df.to_csv(os.path.join("data", "market_data.csv"), index=False)
+print("Saved CSVs to data/ (nifty.csv, vix.csv, market_data.csv)")
+
 for _, row in df.iterrows():
     rows.append((
         row["date"],
