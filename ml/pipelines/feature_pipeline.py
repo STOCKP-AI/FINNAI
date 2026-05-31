@@ -68,8 +68,8 @@ df["bb_width"] = (
     (upper_band - lower_band) / rolling_mean
 )
 
-# Dummy FII flow placeholder
-df["fii_flow"] = 0
+# FII flow from market_data table
+df["fii_flow"] = df["fii_flow"]  # Already in the dataframe from query
 
 # Drop NaNs
 df.dropna(inplace=True)

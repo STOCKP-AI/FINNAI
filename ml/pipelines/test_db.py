@@ -8,7 +8,7 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-print("Connecting to Railway PostgreSQL...")
+print("Connecting to SUPABASE...")
 
 try:
 
