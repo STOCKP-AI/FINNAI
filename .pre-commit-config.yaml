@@ -1,0 +1,50 @@
+# Checks that run on every `git commit`. One-time setup per laptop:
+#   uv run pre-commit install
+# Run on everything:  uv run pre-commit run --all-files
+exclude: ^ml/pipelines/data/.*\.csv$
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        exclude: \.(bat|cmd|ps1)$
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+      - id: no-commit-to-branch  # work on a branch and open a pull request
+        args: [--branch, main]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.10
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.9.1
+    hooks:
+      - id: nbstripout  # never commit notebook outputs
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.12.23
+    hooks:
+      - id: uv-lock  # keep uv.lock in sync with the pyproject.toml files
+        files: (^|/)(uv\.lock|pyproject\.toml)$
+
+  - repo: local
+    hooks:
+      - id: no-env-files
+        name: never commit .env files
+        entry: .env files hold secrets; keep them out of Git
+        language: fail
+        files: (^|/)\.env(\..*)?$
+        exclude: \.env\.example$

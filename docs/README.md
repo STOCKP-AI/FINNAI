@@ -1,0 +1,15 @@
+# Documentation
+
+The project documents are Word files shared with the team (not committed here):
+
+| Document | Purpose |
+|---|---|
+| Prototype Build Plan v2.1 | the PoC plan (phases, deliverables, intended-vs-now register) |
+| Phase 2.5 Audit Report | read-only audit of this repository and the Supabase project (7 Oct 2026) |
+| Full Project Document v2.3 | requirements (FR-*), architecture, data and model design |
+| Build Plan v2.3 / Deployment Plan v2.2 | Release 1.0 build and zero-cost deployment |
+| Security & Observability Architecture | threat model, controls, `MM-*` error catalogue, health checks |
+| SDLC & Master Test Plan v1.1 | process, quality gates and the TC-* test cases |
+
+Short technical notes that must stay next to the code (architecture decisions,
+regime definitions) go in this folder as Markdown, one file per topic.

@@ -1,0 +1,41 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Ingest (dry run)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "marketmood_ml.pipelines.ingest",
+      "args": ["--dry-run"],
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Features (dry run)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "marketmood_ml.pipelines.features",
+      "args": ["--dry-run"],
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "API (uvicorn, reload)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--reload", "--port", "8000"],
+      "envFile": "${workspaceFolder}/.env",
+      "jinja": true,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Current test file",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}", "-x", "-q"],
+      "console": "integratedTerminal"
+    }
+  ]
+}
