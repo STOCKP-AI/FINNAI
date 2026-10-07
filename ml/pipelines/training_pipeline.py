@@ -1,3 +1,9 @@
+# Phase 2 prototype - SUPERSEDED, replaced in Phase 3.
+# Known problems (audit A2): Viterbi predict() uses future data, confidence is a
+# fixed 0.85 and the signals are hard-coded text. Its output is tagged
+# "HMM_v1-placeholder" (migration 003) and must not be shown as model output.
+# WARNING: running this file deletes and rewrites every row in regime_output.
+
 import pandas as pd
 import psycopg2
 from dotenv import load_dotenv
@@ -126,7 +132,7 @@ for _, row in df.iterrows():
         signal_1,
         signal_2,
         signal_3,
-        "HMM_v1"
+        "HMM_v1-placeholder"
     ))
 
 conn.commit()
