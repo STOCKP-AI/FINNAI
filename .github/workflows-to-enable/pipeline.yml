@@ -1,0 +1,67 @@
+# Runs the data pipeline against Supabase on demand: Actions -> Data pipeline -> Run workflow.
+# First run after Phase 2.5: mode = full (reloads 10 years, fills the 17 missing days and
+# everything since 29 Jun 2026), then features are recomputed.
+# Needs the repository secret DATABASE_URL (Session pooler connection string).
+# The nightly schedule (19:30 IST + 23:00 retry) is added in Phase 6.
+name: Data pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "incremental = last stored date - 5 days to today; full = last 10 years"
+        type: choice
+        options: [incremental, full]
+        default: incremental
+      dry_run:
+        description: "Download and check only; write nothing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: data-pipeline
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      MODE: ${{ inputs.mode }}
+      DRY_RUN: ${{ inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.23"
+      - name: Install (ML package only)
+        run: uv sync --package marketmood-ml --locked --no-dev
+      - name: Check the connection
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: uv run --no-sync mm-check-db
+      - name: Ingest NIFTY 50 + India VIX
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          args=()
+          [ "$MODE" = "full" ] && args+=(--full)
+          [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
+          uv run --no-sync mm-ingest "${args[@]}"
+      - name: Recompute features
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          args=()
+          [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
+          uv run --no-sync mm-features "${args[@]}"
+      - name: Row counts after the run
+        if: always()
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: uv run --no-sync mm-check-db
