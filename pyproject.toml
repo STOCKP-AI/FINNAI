@@ -1,0 +1,67 @@
+# Workspace root. Members: ml/ (data pipeline + model) and backend/ (API).
+# One lockfile (uv.lock) and one virtual environment (.venv) for the whole repository.
+#   uv sync                 install everything (Python 3.12 is downloaded if missing)
+#   uv run pytest           run all tests
+#   uv run ruff check .     lint
+
+[project]
+name = "marketmood"
+version = "0.2.5"
+description = "MarketMood workspace: installs both packages for development"
+requires-python = ">=3.12,<3.13"
+dependencies = ["marketmood-ml", "marketmood-backend"]
+
+[tool.uv]
+package = false  # the root itself is not a package
+required-version = ">=0.12"
+# Lock only for the machines we use: Windows x64, macOS (Intel and Apple Silicon),
+# Linux x86_64 (GitHub Actions, Codespaces, Render, Cloud Run). Keeps uv.lock small.
+environments = [
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+    "sys_platform == 'darwin'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+[tool.uv.sources]
+marketmood-ml = { workspace = true }
+marketmood-backend = { workspace = true }
+
+[tool.uv.workspace]
+members = ["ml", "backend"]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.13,<3",  # FastAPI/Starlette TestClient
+    "pre-commit>=4.6,<5",
+    "pytest>=9.1,<10",
+    "pytest-cov>=7.1,<8",
+    "ruff>=0.16,<0.17",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+extend-exclude = ["ml/legacy"]  # frozen Phase 2 reference code, left as written
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "C4"]
+ignore = ["SIM108"]  # ternaries are not always clearer
+
+[tool.ruff.lint.isort]
+known-first-party = ["marketmood_ml", "app", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["ml/tests", "backend/tests"]
+addopts = ["-ra", "--strict-markers", "--import-mode=importlib"]
+pythonpath = ["ml"]
+markers = [
+    "integration: needs TEST_DATABASE_URL pointing at a disposable Postgres (CI provides one)",
+]
+filterwarnings = ["error::DeprecationWarning:marketmood_ml.*"]
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

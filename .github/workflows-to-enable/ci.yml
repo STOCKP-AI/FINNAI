@@ -1,0 +1,91 @@
+# Runs on every pull request and on every push to main.
+# lint: ruff + lockfile check. test: migrations on a fresh Postgres 17, then all tests.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.23"
+      - name: Lockfile is up to date
+        run: uv lock --check
+      - name: Install
+        run: uv sync --locked
+      - name: Ruff lint
+        run: uv run ruff check --output-format=github .
+      - name: Ruff format
+        run: uv run ruff format --check .
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.23"
+      - name: Install
+        run: uv sync --locked
+
+      - name: Apply database migrations (as on Supabase)
+        run: |
+          # Recreate Supabase's API roles and its default grants, so migration 002 is really tested
+          psql -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;" \
+            -c "GRANT USAGE ON SCHEMA public TO anon, authenticated;" \
+            -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated;"
+          for f in db/migrations/[0-9]*.sql; do
+            echo "::group::$f"
+            psql -v ON_ERROR_STOP=1 --single-transaction -f "$f"
+            echo "::endgroup::"
+          done
+
+      - name: API roles have no table privileges (migration 002)
+        run: |
+          n=$(psql -tAc "SELECT count(*) FROM information_schema.role_table_grants WHERE table_schema = 'public' AND grantee IN ('anon', 'authenticated')")
+          echo "grants: $n"
+          test "$n" = "0"
+
+      - name: ML tests (unit + integration), coverage >= 85%
+        run: uv run pytest ml/tests --cov=marketmood_ml --cov-report=term-missing --cov-fail-under=85
+
+      - name: Backend tests, coverage >= 80%
+        run: uv run pytest backend/tests --cov=app --cov-report=term-missing --cov-fail-under=80

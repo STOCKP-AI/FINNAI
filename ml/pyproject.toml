@@ -1,0 +1,27 @@
+[project]
+name = "marketmood-ml"
+version = "0.2.5"
+description = "MarketMood data pipeline (NIFTY 50 + India VIX) and market-regime model"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "hmmlearn>=0.3.3,<0.4",
+    "matplotlib>=3.10,<4",
+    "numpy>=2.4,<3",
+    "pandas>=3.0.3,<4",
+    "psycopg[binary]>=3.3,<4",
+    "python-dotenv>=1.2,<2",
+    "scikit-learn>=1.8,<2",
+    "yfinance>=1.3,<2",
+]
+
+[project.scripts]
+mm-check-db = "marketmood_ml.check_connection:main"
+mm-features = "marketmood_ml.pipelines.features:main"
+mm-ingest = "marketmood_ml.pipelines.ingest:main"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/marketmood_ml"]

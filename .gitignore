@@ -149,6 +149,8 @@ activemq-data/
 
 # Environments
 .env
+.env.*
+!.env.example
 .envrc
 .venv
 env/
@@ -195,9 +197,9 @@ cython_debug/
 .abstra/
 
 # Visual Studio Code
-#   Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
+#   Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore
 #   that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
-#   and can be added to the global gitignore or merged into this file. However, if you prefer, 
+#   and can be added to the global gitignore or merged into this file. However, if you prefer,
 #   you could uncomment the following to ignore the entire vscode folder
 # .vscode/
 # Temporary file for partial code execution
@@ -220,9 +222,20 @@ __marimo__/
 node_modules/
 dist/
 
-# VS Code
-.vscode/
+# VS Code: share the team settings, ignore personal files
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
 
 # Mac / Windows
 .DS_Store
 Thumbs.db
+
+# MarketMood
+mlruns/
+ml/artifacts/
+ml/data/**/*
+!ml/data/**/.gitkeep
+*.parquet
+.yf_cache/
