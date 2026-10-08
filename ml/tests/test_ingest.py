@@ -1,10 +1,9 @@
-"""Tests for ml/pipelines/ingest.py (TC-DATA-01, 02, 03, 06, 07 and helpers).
+"""Unit tests for marketmood_ml.pipelines.ingest (TC-DATA-01, 02, 03, 06, 07).
 
-Run from the ml/ folder:  python -m unittest discover -s tests -v
+Run from the repository root:  uv run pytest
 No network and no database: Yahoo Finance and Postgres are replaced by fakes.
 """
 
-import argparse
 import unittest
 from contextlib import contextmanager
 from datetime import date, datetime
@@ -13,34 +12,11 @@ from unittest import mock
 import numpy as np
 import pandas as pd
 
-from pipelines import ingest
-from pipelines.common import MM_DATA_002, MM_DATA_003, PipelineError, describe_database_url
-from tests.helpers import market_frame, yfinance_frame
+from marketmood_ml.common import MM_DATA_002, MM_DATA_003, PipelineError, describe_database_url
+from marketmood_ml.pipelines import ingest
+from tests.helpers import FakeYahoo, args, market_frame, yfinance_frame
 
 FAKE_URL = "postgresql://postgres.abc:s3cret-pw@aws-0-ap-south-1.pooler.supabase.com:5432/postgres"
-
-
-def args(**kw):
-    base = {"full": False, "start": None, "dry_run": False}
-    base.update(kw)
-    return argparse.Namespace(**base)
-
-
-class FakeYahoo:
-    """Serves yfinance-shaped frames for NIFTY and VIX, filtered to the requested range."""
-
-    def __init__(self, market, vix_missing=()):
-        self.market = market
-        self.vix_missing = {pd.Timestamp(d) for d in vix_missing}
-        self.calls = []
-
-    def __call__(self, ticker, start, end, **_):
-        self.calls.append((ticker, start, end))
-        m = self.market[(self.market["date"].dt.date >= start) & (self.market["date"].dt.date <= end)]
-        if ticker == ingest.VIX_TICKER:
-            m = m[~m["date"].isin(self.vix_missing)]
-            return yfinance_frame(m, ticker, price_col="vix_close")
-        return yfinance_frame(m, ticker)
 
 
 class FakeDatabase:
@@ -122,9 +98,11 @@ class TestRetries(unittest.TestCase):
 
     def test_timeout_retries_three_times_then_fails(self):
         sleeps = []
-        with mock.patch.object(ingest.yf, "download", side_effect=TimeoutError("read timed out")) as dl:
-            with self.assertRaises(PipelineError) as ctx:
-                ingest.download("^NSEI", date(2026, 9, 1), date(2026, 9, 30), sleep=sleeps.append)
+        with (
+            mock.patch.object(ingest.yf, "download", side_effect=TimeoutError("read timed out")) as dl,
+            self.assertRaises(PipelineError) as ctx,
+        ):
+            ingest.download("^NSEI", date(2026, 9, 1), date(2026, 9, 30), sleep=sleeps.append)
         self.assertEqual(ctx.exception.code, MM_DATA_003)
         self.assertEqual(dl.call_count, 4)
         self.assertEqual(sleeps, [2, 4, 8])
@@ -137,9 +115,11 @@ class TestRetries(unittest.TestCase):
         self.assertFalse(out.empty)
 
     def test_main_returns_1_on_fetch_failure(self):
-        with mock.patch.object(ingest, "run", side_effect=PipelineError(MM_DATA_003, "down")):
-            with self.assertLogs("ingest", "ERROR") as logs:
-                self.assertEqual(ingest.main(["--full", "--dry-run"]), 1)
+        with (
+            mock.patch.object(ingest, "run", side_effect=PipelineError(MM_DATA_003, "down")),
+            self.assertLogs("ingest", "ERROR") as logs,
+        ):
+            self.assertEqual(ingest.main(["--full", "--dry-run"]), 1)
         self.assertIn("MM-DATA-003", logs.output[0])
 
 
@@ -279,11 +259,13 @@ class TestLatestDay(unittest.TestCase):
         self.assertEqual(max(db.table), date(2026, 9, 30))
 
     def test_database_error_exits_1_with_code(self):
-        import psycopg2
+        import psycopg
 
-        with mock.patch.object(ingest, "run", side_effect=psycopg2.OperationalError("timeout expired")):
-            with self.assertLogs("ingest", "ERROR") as logs:
-                self.assertEqual(ingest.main([]), 1)
+        with (
+            mock.patch.object(ingest, "run", side_effect=psycopg.OperationalError("timeout expired")),
+            self.assertLogs("ingest", "ERROR") as logs,
+        ):
+            self.assertEqual(ingest.main([]), 1)
         self.assertIn("MM-DB-001", logs.output[0])
 
 

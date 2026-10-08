@@ -1,6 +1,6 @@
-"""Tests for ml/pipelines/feature_pipeline.py (TC-DATA-04, TC-DATA-05 and regression).
+"""Unit tests for marketmood_ml.pipelines.features (TC-DATA-04, TC-DATA-05, regression).
 
-Run from the ml/ folder:  python -m unittest discover -s tests -v
+Run from the repository root:  uv run pytest
 """
 
 import unittest
@@ -8,8 +8,8 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from pipelines.common import EXCLUDED_FEATURES, FEATURE_COLUMNS
-from pipelines.feature_pipeline import WARMUP_ROWS, compute_features, to_rows, validate_features
+from marketmood_ml.common import EXCLUDED_FEATURES, FEATURE_COLUMNS
+from marketmood_ml.pipelines.features import WARMUP_ROWS, compute_features, to_rows, validate_features
 from tests.helpers import market_frame
 
 
@@ -38,13 +38,15 @@ class TestDrawdown(unittest.TestCase):
     def test_hand_made_series(self):
         n = 130
         close = np.full(n, 100.0)
-        close[70] = 120.0   # new peak
-        close[80] = 90.0    # 25% below the 120 peak
-        market = pd.DataFrame({
-            "date": pd.bdate_range("2024-01-01", periods=n),
-            "close": close + np.linspace(0, 0.5, n),  # tiny trend so std is never 0
-            "vix_close": np.linspace(12, 18, n),
-        })
+        close[70] = 120.0  # new peak
+        close[80] = 90.0  # 25% below the 120 peak
+        market = pd.DataFrame(
+            {
+                "date": pd.bdate_range("2024-01-01", periods=n),
+                "close": close + np.linspace(0, 0.5, n),  # tiny trend so std is never 0
+                "vix_close": np.linspace(12, 18, n),
+            }
+        )
         f = compute_features(market).set_index("date")
         c = market.set_index("date")["close"]
         expected = c / c.rolling(60).max() - 1
