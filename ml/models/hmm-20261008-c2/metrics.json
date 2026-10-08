@@ -1,0 +1,297 @@
+{
+  "periods": [
+    {
+      "start": "2017-01-01",
+      "end": "2018-01-31",
+      "expected": [
+        "Bull"
+      ],
+      "event": "Steady low-volatility rally",
+      "top": "Bull",
+      "share": 0.933,
+      "shares": {
+        "Bull": 0.933,
+        "Sideways": 0.067
+      },
+      "correct": true
+    },
+    {
+      "start": "2018-09-01",
+      "end": "2018-10-31",
+      "expected": [
+        "Crisis",
+        "Sideways"
+      ],
+      "event": "IL&FS credit scare",
+      "top": "Crisis",
+      "share": 0.385,
+      "shares": {
+        "Crisis": 0.385,
+        "Bull": 0.308,
+        "Sideways": 0.308
+      },
+      "correct": true
+    },
+    {
+      "start": "2020-03-01",
+      "end": "2020-04-30",
+      "expected": [
+        "Crisis"
+      ],
+      "event": "COVID crash",
+      "top": "Crisis",
+      "share": 0.974,
+      "shares": {
+        "Crisis": 0.974,
+        "Sideways": 0.026
+      },
+      "correct": true
+    },
+    {
+      "start": "2020-06-01",
+      "end": "2021-10-31",
+      "expected": [
+        "Bull"
+      ],
+      "event": "Post-COVID bull run",
+      "top": "Sideways",
+      "share": 0.713,
+      "shares": {
+        "Sideways": 0.713,
+        "Bull": 0.242,
+        "Crisis": 0.045
+      },
+      "correct": false
+    },
+    {
+      "start": "2022-01-01",
+      "end": "2022-06-30",
+      "expected": [
+        "Crisis",
+        "Sideways"
+      ],
+      "event": "Rate hikes, Russia-Ukraine",
+      "top": "Sideways",
+      "share": 0.626,
+      "shares": {
+        "Sideways": 0.626,
+        "Crisis": 0.374
+      },
+      "correct": true
+    },
+    {
+      "start": "2023-04-01",
+      "end": "2023-12-31",
+      "expected": [
+        "Bull"
+      ],
+      "event": "Broad rally to new highs",
+      "top": "Bull",
+      "share": 0.88,
+      "shares": {
+        "Bull": 0.88,
+        "Sideways": 0.12
+      },
+      "correct": true
+    }
+  ],
+  "periods_correct": 5,
+  "macro_f1": 0.5532,
+  "macro_f1_test": 0.4364,
+  "macro_f1_benchmark": 0.6582,
+  "confusion": {
+    "Bull": {
+      "Bull": 621,
+      "Sideways": 603,
+      "Crisis": 22
+    },
+    "Sideways": {
+      "Bull": 411,
+      "Sideways": 617,
+      "Crisis": 79
+    },
+    "Crisis": {
+      "Bull": 0,
+      "Sideways": 18,
+      "Crisis": 85
+    }
+  },
+  "confusion_benchmark": {
+    "Bull": {
+      "Bull": 995,
+      "Sideways": 251,
+      "Crisis": 0
+    },
+    "Sideways": {
+      "Bull": 674,
+      "Sideways": 433,
+      "Crisis": 0
+    },
+    "Crisis": {
+      "Bull": 25,
+      "Sideways": 7,
+      "Crisis": 71
+    }
+  },
+  "switches_per_year_test": 4.07,
+  "switches_per_year_all": 5.15,
+  "transition_lag_2020": 0,
+  "label_days": {
+    "Bull": 1052,
+    "Sideways": 1258,
+    "Crisis": 186
+  },
+  "mean_confidence": 0.9737,
+  "backtest_all": {
+    "strategy": {
+      "cagr": 0.092,
+      "volatility": 0.0973,
+      "sharpe": 0.355,
+      "max_drawdown": -0.1574,
+      "final_value": 2.3917
+    },
+    "buy_hold": {
+      "cagr": 0.1,
+      "volatility": 0.1617,
+      "sharpe": 0.311,
+      "max_drawdown": -0.3844,
+      "final_value": 2.5701
+    },
+    "weight_changes": 51,
+    "delay_days": 1,
+    "cost": 0.001,
+    "cash_rate": 0.06
+  },
+  "backtest_test": {
+    "strategy": {
+      "cagr": -0.0307,
+      "volatility": 0.0851,
+      "sharpe": -1.009,
+      "max_drawdown": -0.1192,
+      "final_value": 0.9406
+    },
+    "buy_hold": {
+      "cagr": -0.0576,
+      "volatility": 0.1308,
+      "sharpe": -0.834,
+      "max_drawdown": -0.1556,
+      "final_value": 0.8899
+    },
+    "weight_changes": 8,
+    "delay_days": 1,
+    "cost": 0.001,
+    "cash_rate": 0.06
+  },
+  "latest": {
+    "date": "2026-10-08",
+    "label": "Sideways",
+    "confirmed_label": "Sideways",
+    "confidence": 0.997156
+  },
+  "seed": 1,
+  "log_likelihood": -17042.994,
+  "log_likelihood_by_seed": {
+    "0": -17100.901,
+    "1": -17042.994,
+    "2": -17109.454,
+    "3": -17109.454,
+    "4": -17109.454,
+    "5": -17109.454,
+    "6": -17109.454,
+    "7": -17109.454,
+    "8": -17109.454,
+    "9": -17109.454
+  },
+  "surrogate_fidelity": 0.9928,
+  "surrogate_fidelity_test": 0.9192,
+  "state_days": {
+    "0:Bull": 850,
+    "1:Sideways": 996,
+    "2:Crisis": 155
+  },
+  "gates": {
+    "periods": true,
+    "macro_f1": false,
+    "fidelity": true,
+    "stability": true,
+    "transition_lag": true
+  },
+  "passed": false,
+  "walk_forward": {
+    "start": "2019-01-02",
+    "end": "2026-10-08",
+    "periods": [
+      {
+        "start": "2020-03-01",
+        "end": "2020-04-30",
+        "expected": [
+          "Crisis"
+        ],
+        "event": "COVID crash",
+        "top": "Crisis",
+        "share": 1.0,
+        "shares": {
+          "Crisis": 1.0
+        },
+        "correct": true
+      },
+      {
+        "start": "2020-06-01",
+        "end": "2021-10-31",
+        "expected": [
+          "Bull"
+        ],
+        "event": "Post-COVID bull run",
+        "top": "Sideways",
+        "share": 0.403,
+        "shares": {
+          "Sideways": 0.403,
+          "Crisis": 0.375,
+          "Bull": 0.223
+        },
+        "correct": false
+      },
+      {
+        "start": "2022-01-01",
+        "end": "2022-06-30",
+        "expected": [
+          "Crisis",
+          "Sideways"
+        ],
+        "event": "Rate hikes, Russia-Ukraine",
+        "top": "Sideways",
+        "share": 0.943,
+        "shares": {
+          "Sideways": 0.943,
+          "Crisis": 0.057
+        },
+        "correct": true
+      },
+      {
+        "start": "2023-04-01",
+        "end": "2023-12-31",
+        "expected": [
+          "Bull"
+        ],
+        "event": "Broad rally to new highs",
+        "top": "Bull",
+        "share": 0.885,
+        "shares": {
+          "Bull": 0.885,
+          "Sideways": 0.115
+        },
+        "correct": true
+      }
+    ],
+    "periods_correct": 3,
+    "periods_scored": 4,
+    "macro_f1": 0.4739,
+    "switches_per_year": 5.79,
+    "transition_lag_2020": 0,
+    "label_days": {
+      "Bull": 659,
+      "Sideways": 856,
+      "Crisis": 401
+    }
+  }
+}

@@ -3,14 +3,17 @@
 Agentic AI market-regime detection for Indian retail investors: an HMM on NIFTY 50
 data, SHAP-based signals and an educational AI chat.
 
-> Status: Phase 2.5 done (data-pipeline fixes, tooling, CI). The rows in `regime_output`
-> are tagged `HMM_v1-placeholder` until Phase 3 — do not present them as model output.
+> Status: Phase 3 done. `regime_output` holds causal labels from model `hmm-20261008-c2`,
+> status **experimental**: 5 of 6 reference periods, but macro-F1 0.55 against the 0.60
+> target ([validation](docs/validation.md), [decisions](docs/adr/0001-regime-model.md)).
 
 ## Repository layout
 
 ```
 ml/                      data pipeline + model (Python package marketmood_ml)
-  src/marketmood_ml/     common.py, check_connection.py, pipelines/{ingest,features}.py
+  src/marketmood_ml/     common.py, check_connection.py, pipelines/{ingest,features,train,infer,nightly,register}.py
+                         model/ (HMM, labels, explanations, evaluation, registry)
+  models/                released model versions (JSON + LightGBM text, checksummed)
   tests/                 unit, integration and real-history tests
   pipelines/data/        Yahoo snapshot CSVs used as test fixtures
   legacy/                Phase 2 training script, kept for reference only
@@ -47,6 +50,9 @@ pyproject.toml, uv.lock  workspace definition and locked versions for everyone
    or many home networks.
 4. **VS Code**: open the folder, accept the recommended extensions, and pick the
    `.venv` interpreter when asked. Formatting and import sorting run on save.
+5. **LightGBM** (explanations) needs a system library: on macOS run `brew install libomp`
+   once; on Windows it uses the Microsoft Visual C++ Redistributable (x64), which most
+   machines already have. Check: `uv run python -c "import lightgbm"`.
 
 ## Daily commands
 
@@ -56,6 +62,10 @@ uv run mm-ingest --dry-run         # download and check NIFTY + VIX, write nothi
 uv run mm-ingest                   # incremental: last stored date - 5 days -> today
 uv run mm-ingest --full            # reload 10 years
 uv run mm-features                 # recompute features
+uv run mm-infer                    # regime labels for every day with the active model
+uv run mm-nightly                  # ingest -> features -> labels, logged in pipeline_runs
+uv run mm-train                    # retrain: pre-registered sweep, report (see ml/models/README.md)
+uv run mm-register ml/models/<version>  # make a committed model the active one (fresh database)
 uv run pytest                      # all tests (integration tests skip without a test DB)
 uv run ruff check . ; uv run ruff format .
 uv run uvicorn app.main:app --reload   # API on http://localhost:8000/livez
@@ -73,6 +83,11 @@ Exit codes: 0 success (including "no new data" on holidays); 1 known failure wit
 | `MM-DATA-002` | data-quality check failed; nothing was written |
 | `MM-DATA-003` | Yahoo Finance download failed after 3 retries |
 | `MM-DB-001` | database connection or query failed (check `DATABASE_URL`, use the pooler) |
+| `MM-MODEL-001` | a model file is missing or its checksum differs; inference refused |
+| `MM-MODEL-002` | a new model missed a gate; not registered, the active model is kept |
+| `MM-MODEL-003` | no active model in `model_registry` |
+| `MM-MODEL-004` | a model version already exists with different files |
+| `MM-CONFIG-002` | LightGBM could not load its system library (see Getting started, step 5) |
 
 ## Tests
 
@@ -86,6 +101,17 @@ Exit codes: 0 success (including "no new data" on holidays); 1 known failure wit
 | TC-DATA-06 | a source timeout is retried 3 times (2 s, 4 s, 8 s), then `MM-DATA-003` |
 | TC-DATA-07 | a close of 0 blocks the write with `MM-DATA-002` |
 | Real history | the 17 days the old inner join dropped are recovered; features equal the values stored in Supabase |
+| TC-ML-01 | a 3-regime synthetic series is recovered (>= 90% of days) |
+| TC-ML-02 | probabilities for day t are identical with or without later days (no look-ahead) |
+| TC-ML-03 | training twice with the same seeds gives identical files |
+| TC-ML-04 | state names follow the market (any state numbering); a crash before a rebound stays Crisis |
+| TC-ML-05 | the released model gets >= 5 of 6 reference periods on the real snapshot |
+| TC-ML-06 | macro-F1 and confusion matrix are saved; the status follows the gates |
+| TC-ML-07 | surrogate fidelity >= 95% (synthetic and real data) |
+| TC-ML-08 | a changed or missing model file is refused with `MM-MODEL-001` (unit and end to end) |
+| TC-ML-09 | a one-day flip does not change the confirmed label |
+| TC-ML-11 | the backtest changes with an extra day of delay and reruns are identical |
+| Idempotency | `mm-infer` twice writes nothing the second time; `mm-nightly` logs one `pipeline_runs` row |
 
 Integration tests need `TEST_DATABASE_URL` pointing at a **disposable** Postgres with the
 migrations applied (CI does this automatically); they refuse to run against Supabase.
@@ -96,7 +122,7 @@ migrations applied (CI does this automatically); they refuse to run against Supa
 |---|---|---|
 | CI | every pull request and push to `main`: lockfile, ruff, migrations on Postgres 17, tests with coverage (ml ≥ 85%, backend ≥ 80%) | nothing |
 | Supabase keep-alive | Monday and Thursday 08:47 IST, or manually | secret `DATABASE_URL` |
-| Data pipeline | manually (Actions → Data pipeline → Run workflow); nightly from Phase 6 | secret `DATABASE_URL` |
+| Data pipeline | manually (Actions → Data pipeline → Run workflow); nightly from Phase 6. Does not refresh `regime_output` yet: run `uv run mm-infer` afterwards | secret `DATABASE_URL` |
 
 Add the secret under Settings → Secrets and variables → Actions → New repository
 secret, name `DATABASE_URL`, value = the Session pooler string.
