@@ -31,6 +31,11 @@ EXCLUDED_FEATURES = ["fii_flow"]
 MM_DATA_002 = "MM-DATA-002"  # data-quality gate failed, nothing written
 MM_DATA_003 = "MM-DATA-003"  # market data fetch failed after retries
 MM_DB_001 = "MM-DB-001"  # database connection or query failed
+MM_MODEL_001 = "MM-MODEL-001"  # model file missing or checksum mismatch, run refused
+MM_MODEL_002 = "MM-MODEL-002"  # new model failed its gates, current model kept
+MM_MODEL_003 = "MM-MODEL-003"  # no active model in model_registry
+MM_MODEL_004 = "MM-MODEL-004"  # a model version already exists with different files
+MM_CONFIG_002 = "MM-CONFIG-002"  # a native library (LightGBM) could not be loaded
 
 
 class PipelineError(Exception):

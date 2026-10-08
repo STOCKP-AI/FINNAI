@@ -3,7 +3,7 @@
 Usage: uv run mm-check-db   (or: python -m marketmood_ml.check_connection)
 
 Prints the host, port, user and connection type (never the password), the Postgres
-version and the row count and latest date of each pipeline table. Renamed from
+version, the row count and latest date of each pipeline table and the active model. Renamed from
 test_db.py so that a test runner never mistakes it for a unit test.
 """
 
@@ -37,6 +37,15 @@ def main():
                 cur.execute(f"SELECT count(*), max(date) FROM {table};")
                 count, latest = cur.fetchone()
                 log.info("%-14s %6d rows, latest %s", table, count, latest)
+            cur.execute("SELECT to_regclass('public.model_registry') IS NOT NULL;")
+            if cur.fetchone()[0]:  # exists from migration 004
+                cur.execute("SELECT version, status FROM model_registry WHERE is_active;")
+                row = cur.fetchone()
+                log.info(
+                    "%-14s %s",
+                    "active model",
+                    f"{row[0]} ({row[1]})" if row else "none (mm-train --register)",
+                )
     except Exception as exc:
         log.error("Connection failed: %s", exc)
         return 1
