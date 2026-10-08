@@ -238,3 +238,4 @@ ml/artifacts/
 ml/data/**/*
 !ml/data/**/.gitkeep
 *.parquet
+.yf_cache/
