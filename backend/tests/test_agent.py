@@ -142,8 +142,9 @@ def test_adapter_maps_provider_errors(error, code):
 
 def test_make_client():
     assert isinstance(make_client(LLMConfig("mock", None, None, None, 5)), MockClient)
-    real = make_client(CONFIG)
-    assert isinstance(real, OpenAICompatClient) and real.model == CONFIG.model
+    real = make_client(CONFIG)  # wrapped for retries; no fallback configured
+    assert isinstance(real.primary, OpenAICompatClient) and real.model == CONFIG.model
+    assert real.fallback is None
 
 
 # --- orchestrator ------------------------------------------------------------------------------

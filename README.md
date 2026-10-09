@@ -56,8 +56,9 @@ pyproject.toml, uv.lock  workspace definition and locked versions for everyone
    once; on Windows it uses the Microsoft Visual C++ Redistributable (x64), which most
    machines already have. Check: `uv run python -c "import lightgbm"`.
 6. **AI analyst keys** (free, no billing account): create `backend/.env` with `LLM_PROVIDER`,
-   `LLM_API_KEY` (Google AI Studio), `JUDGE_PROVIDER=groq`, `JUDGE_API_KEY` (Groq) and
-   `IP_HASH_PEPPER` - see `.env.example`. Without keys, `LLM_PROVIDER=mock` works offline.
+   `LLM_API_KEY` (Google AI Studio), `LLM_FALLBACK_PROVIDER=groq` + `LLM_FALLBACK_API_KEY` (used
+   when Gemini is busy), `JUDGE_PROVIDER=groq`, `JUDGE_API_KEY` (Groq) and `IP_HASH_PEPPER` -
+   see `.env.example`. Without keys, `LLM_PROVIDER=mock` works offline.
 
 ## Daily commands
 

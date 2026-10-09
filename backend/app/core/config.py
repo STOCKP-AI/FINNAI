@@ -4,7 +4,8 @@ Files read, later ones overriding earlier ones: ml/.env, .env (repository root),
 Variables set in the environment (Render, GitHub Actions) win over all files.
 
 Prototype AI (no paid key): LLM_PROVIDER=gemini with a free Google AI Studio key;
-LLM_PROVIDER=groq as the backup; LLM_PROVIDER=mock needs no key (tests, demo fallback).
+LLM_FALLBACK_PROVIDER=groq answers automatically when Gemini is busy or rate-limited;
+LLM_PROVIDER=mock needs no key (tests, demo fallback).
 """
 
 from datetime import date
@@ -61,6 +62,12 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr | None = None
     llm_timeout_s: float = 30.0
 
+    # Automatic fallback when the main model is busy or rate-limited (HTTP 429/503).
+    llm_fallback_provider: Provider | None = None
+    llm_fallback_base_url: str | None = None
+    llm_fallback_model: str | None = None
+    llm_fallback_api_key: SecretStr | None = None
+
     # Second model for the eval judge (a different model from the one being tested).
     judge_provider: Provider | None = None
     judge_base_url: str | None = None
@@ -94,6 +101,17 @@ class Settings(BaseSettings):
     def llm(self):
         return LLMConfig(
             self.llm_provider, self.llm_base_url, self.llm_model, self.llm_api_key, self.llm_timeout_s
+        )
+
+    def llm_fallback(self):
+        if not self.llm_fallback_provider:
+            return None
+        return LLMConfig(
+            self.llm_fallback_provider,
+            self.llm_fallback_base_url,
+            self.llm_fallback_model,
+            self.llm_fallback_api_key,
+            self.llm_timeout_s,
         )
 
     def judge(self):

@@ -71,6 +71,7 @@ class Orchestrator:
                 elif isinstance(ev, Done):
                     final.tokens_in += ev.tokens_in or 0
                     final.tokens_out += ev.tokens_out or 0
+            final.model = getattr(self.llm, "model", final.model)  # the fallback may have answered
             if not calls:
                 yield final
                 return
@@ -105,4 +106,5 @@ class Orchestrator:
             elif isinstance(ev, Done):
                 final.tokens_in += ev.tokens_in or 0
                 final.tokens_out += ev.tokens_out or 0
+        final.model = getattr(self.llm, "model", final.model)
         yield final
