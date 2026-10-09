@@ -58,8 +58,8 @@ def seed(conn, n=300, end=None):
     close = 20000.0
     with conn.cursor() as cur:
         cur.execute(
-            "TRUNCATE regime_output, model_registry, chat_messages, chat_sessions, usage_daily, "
-            "answer_cache, "
+            "TRUNCATE regime_output, model_registry, chat_feedback, chat_messages, chat_sessions, "
+            "usage_daily, answer_cache, "
             "daily_briefs, glossary, market_data, features"
         )
         cur.execute(

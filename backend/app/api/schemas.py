@@ -106,6 +106,14 @@ class ChatRequest(BaseModel):
     chip_id: ChipId | None = Field(None, description="A suggestion chip; its fixed question is used")
 
 
+class FeedbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    session_id: UUID = Field(description="The session_id from the chat's done event")
+    message_id: int = Field(ge=1, description="The message_id from the chat's done event")
+    rating: Literal["up", "down"]
+
+
 class ErrorDetail(BaseModel):
     code: str
     message: str

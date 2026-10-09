@@ -71,6 +71,25 @@ def save_exchange(session_id, question, final, answer):
         return cur.fetchone()[0]
 
 
+def save_feedback(session_id, client_hash, message_id, rating):
+    """Record +1 / -1 on an assistant answer of the caller's own session (CHAT-09).
+
+    The last click wins. Raises MM-REQ-003 (404) if the answer is not in that session, so a
+    visitor can never rate (or probe) someone else's conversation.
+    """
+    with db.writer() as conn, conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO chat_feedback (message_id, rating) "
+            "SELECT m.id, %s FROM chat_messages m JOIN chat_sessions s ON s.id = m.session_id "
+            "WHERE m.id = %s AND m.session_id = %s AND s.client_hash = %s AND m.role = 'assistant' "
+            "ON CONFLICT (message_id) DO UPDATE SET rating = EXCLUDED.rating, updated_at = now() "
+            "RETURNING message_id",
+            (rating, message_id, session_id, client_hash),
+        )
+        if cur.fetchone() is None:
+            raise ApiError("MM-REQ-003", "That answer was not found in this conversation.")
+
+
 def take_quota(client_hash, limit, day=None):
     """Atomically count one chat; return chats left today, or raise MM-QUOTA-001 (429)."""
     day = day or ist_today()

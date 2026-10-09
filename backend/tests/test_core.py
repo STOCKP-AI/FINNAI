@@ -106,6 +106,13 @@ def test_chat_request_validation(client):
     assert client.post("/v1/chat", json={"message": "hi", "chip_id": "nope"}).status_code == 422
 
 
+def test_feedback_request_validation(client):
+    body = {"session_id": "00000000-0000-4000-8000-000000000000", "message_id": 1}
+    assert client.post("/v1/feedback", json={**body, "rating": "meh"}).status_code == 422
+    assert client.post("/v1/feedback", json={**body, "rating": "up", "comment": "x"}).status_code == 422
+    assert client.post("/v1/feedback", json={**body, "message_id": 0, "rating": "up"}).status_code == 422
+
+
 def test_chat_without_llm_config_is_503(client, settings):
     app = create_app(make_settings(llm_provider="gemini"), open_db=False)
     from app.core.config import get_settings
