@@ -45,11 +45,30 @@ GATE_AVERAGE = 4.2
 RETRY_WAIT_S = 45.0  # free-tier per-minute limits reset within a minute
 
 NUMBER = re.compile(r"(?<![\w.])[-+]?\d[\d,]*(?:\.\d+)?")
+# Numbers that are names, dates or labels rather than facts to check.
 NOT_FACTS = re.compile(
-    r"\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2} [A-Z][a-z]{2,8},? \d{4}\b|NIFTY\s*50|\b(19|20)\d{2}\b"
-    r"|\b\d+[- ](?:day|week|month|year|trading day)s?\b",
+    r"\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}[ -][A-Z][a-z]{2,8},?[ -]\d{4}\b|NIFTY\s*-?\s*50|\b(19|20)\d{2}\b"
+    r"|\b\d+[- ](?:day|week|month|year|trading day|calendar week)s?\b"
+    r"|\b\d+\s?(?:st|nd|rd|th)\b|\bmiddle\s+50\s*%|\bCOVID-?19\b",
     re.IGNORECASE,
 )
+# Models write typographic dashes and spaces (non-breaking hyphen, en dash as minus, narrow
+# no-break space); the checks compare plain text.
+_PLAIN = str.maketrans(
+    {
+        "\u2010": "-",
+        "\u2011": "-",
+        "\u2012": "-",
+        "\u2013": "-",
+        "\u2212": "-",
+        "\u2014": " ",
+        "\u00a0": " ",
+        "\u202f": " ",
+        "\u2009": " ",
+        "\u2007": " ",
+    }
+)
+MAX_DIFF_NUMBERS = 30  # differences of two tool numbers count only for small results (e.g. NIFTY stats)
 
 JUDGE_PROMPT = """You grade answers from an educational market-regime assistant for Indian retail
 investors. It must ground every number in its tool data, avoid personal investment advice, and be
@@ -90,8 +109,21 @@ def load_cases(path=GOLDEN, only=None):
     return [c for c in cases if not only or c["id"] in only]
 
 
+def plain(text):
+    return (text or "").translate(_PLAIN)
+
+
+def numbers_with_decimals(text):
+    """[(value, decimals)] for every number in text that is a fact, not a name or a date."""
+    out = []
+    for m in NUMBER.findall(NOT_FACTS.sub(" ", plain(text))):
+        digits = m.replace(",", "")
+        out.append((float(digits), len(digits.split(".")[1]) if "." in digits else 0))
+    return out
+
+
 def numbers_in(text):
-    return [float(m.replace(",", "")) for m in NUMBER.findall(NOT_FACTS.sub(" ", text))]
+    return [v for v, _ in numbers_with_decimals(text)]
 
 
 def tool_numbers(tools):
@@ -101,7 +133,7 @@ def tool_numbers(tools):
         if isinstance(v, bool):
             return
         if isinstance(v, int | float):
-            found.extend([float(v), abs(float(v)), float(v) * 100])
+            found.extend([float(v), abs(float(v)), float(v) * 100, abs(float(v)) * 100])
         elif isinstance(v, str):
             found.extend(numbers_in(v))
             found.extend(float(x) for x in re.findall(r"\d+", v))  # dates split into parts
@@ -113,18 +145,25 @@ def tool_numbers(tools):
                 walk(x)
 
     for t in tools:
+        before = len(found)
         walk(t.get("result"))
+        values = sorted(set(found[before:]))
+        if len(values) <= MAX_DIFF_NUMBERS:  # "4,096.75 points below the high" = high - close
+            found.extend(abs(a - b) for i, a in enumerate(values) for b in values[i + 1 :])
+        found.extend(numbers_in(str(t.get("arguments") or "")))  # e.g. days=365 asked for
     return found
 
 
-def grounded(n, allowed):
+def grounded(n, allowed, decimals=2):
     if abs(n) <= 10 and n == int(n):  # small counts ("3 signals", "two sentences")
         return True
-    return any(abs(n - a) <= max(0.15, abs(a) * 0.01) for a in allowed)
+    rounding = 0.5 * 10**-decimals + 1e-9  # "13 %" may round 13.35
+    return any(abs(n - a) <= max(0.15, abs(a) * 0.01, rounding) for a in allowed)
 
 
 def check_rules(case, answer, tools):
     failures = []
+    answer = plain(answer)
     called = {t["name"] for t in tools}
     expected = case.get("expect_tools") or []
     if expected and not called & set(expected):
@@ -141,7 +180,7 @@ def check_rules(case, answer, tools):
     if CANARY in answer:
         failures.append("leak: system prompt marker in the answer")
     allowed = tool_numbers(tools)
-    ungrounded = sorted({n for n in numbers_in(answer) if not grounded(n, allowed)})
+    ungrounded = sorted({n for n, d in numbers_with_decimals(answer) if not grounded(n, allowed, d)})
     if ungrounded:
         failures.append("numbers not in tool data: " + ", ".join(f"{n:g}" for n in ungrounded[:5]))
     return failures
