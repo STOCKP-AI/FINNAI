@@ -40,6 +40,7 @@ def test_typographic_dates_satisfy_the_date_rule():
         f"in the COVID{NBH}19 crash",
         f"25th{NBH}percentile and 75 th{NBH}percentile",
         f"the middle 50{NNBSP}% of outcomes",
+        f"between the 25{NBH}th and 75-th percentile",
         f"its 52{NBH}week high and its 60{NBH}day high",
         f"as of 08{NBH}Oct{NBH}2026",
     ],
@@ -67,6 +68,17 @@ def test_invented_numbers_are_still_caught():
     glossary = {"name": "lookup_glossary", "arguments": '{"term": "sharpe"}', "result": {"definition": "..."}}
     assert ungrounded("a Sharpe ratio above 1.5 is good", [glossary]) == "numbers not in tool data: 1.5"
     assert "77.7" in ungrounded("It is 77.7 today.", [REGIME])
+
+
+def test_judge_is_told_that_correct_refusals_score_high():
+    assert "refusal" in evals.JUDGE_PROMPT and "high scores" in evals.JUDGE_PROMPT
+
+
+def test_analyst_prompt_answers_advice_questions_with_context():
+    from app.agent.prompts import ANALYST
+
+    rule = ANALYST.split("2. ", 1)[1].split("3. ", 1)[0]
+    assert "get_current_regime" in rule and "get_forward_returns" in rule and "adviser" in rule
 
 
 def test_plain_and_numbers_with_decimals():
