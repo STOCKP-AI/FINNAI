@@ -1,14 +1,22 @@
 [project]
 name = "marketmood-backend"
-version = "0.1.0"
-description = "MarketMood API (FastAPI). Phase 4 builds the endpoints; only health checks exist now."
+version = "0.2.0"
+description = "MarketMood API (FastAPI): regime endpoints and the AI analyst"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "cachetools>=7.2.0,<7.2.1",  # releases at least 14 days old when added (supply-chain rule)
     "fastapi>=0.136,<1",
+    "openai>=3.19.2,<3.20",  # OpenAI-compatible client for Gemini / Groq; 14-day rule as above
+    "psycopg-pool>=3.3,<4",
     "psycopg[binary]>=3.3,<4",
+    "pydantic-settings>=2.15,<3",
     "python-dotenv>=1.2,<2",
     "uvicorn[standard]>=0.47,<1",
 ]
+
+[project.scripts]
+mm-brief = "app.brief:main"
+mm-evals = "app.evals.run:main"
 
 [build-system]
 requires = ["hatchling>=1.27"]

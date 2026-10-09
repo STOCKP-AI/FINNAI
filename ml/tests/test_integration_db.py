@@ -114,3 +114,17 @@ def test_main_maps_database_errors_to_exit_1(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://nobody:wrong@127.0.0.1:1/none")
     assert features.main([]) == 1
     assert ingest.main([]) == 1
+
+
+def test_floats_are_read_exactly(db):
+    """Supabase sets extra_float_digits = 0 (15 digits); db_connection asks for exact values."""
+    with db_connection(db) as conn, conn.cursor() as cur:
+        cur.execute("SHOW extra_float_digits")
+        assert cur.fetchone()[0] == "3"
+        cur.execute("SET LOCAL extra_float_digits = 0")
+        cur.execute("SELECT 0.0074123776540803181::float8")
+        rounded = cur.fetchone()[0]
+    with db_connection(db) as conn, conn.cursor() as cur:
+        cur.execute("SELECT 0.0074123776540803181::float8")
+        exact = cur.fetchone()[0]
+    assert exact == 0.0074123776540803181 and rounded != exact

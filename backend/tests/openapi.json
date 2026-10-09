@@ -1,0 +1,885 @@
+{
+ "components": {
+  "schemas": {
+   "Brief": {
+    "properties": {
+     "source": {
+      "enum": [
+       "llm",
+       "template"
+      ],
+      "title": "Source",
+      "type": "string"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     },
+     "what_changed": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "What Changed"
+     }
+    },
+    "required": [
+     "text",
+     "what_changed",
+     "source"
+    ],
+    "title": "Brief",
+    "type": "object"
+   },
+   "ChatRequest": {
+    "additionalProperties": false,
+    "properties": {
+     "chip_id": {
+      "anyOf": [
+       {
+        "enum": [
+         "today",
+         "why",
+         "history",
+         "after_crisis",
+         "vix"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "A suggestion chip; its fixed question is used",
+      "title": "Chip Id"
+     },
+     "message": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+     },
+     "session_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Omit to start a new conversation",
+      "title": "Session Id"
+     }
+    },
+    "required": [
+     "message"
+    ],
+    "title": "ChatRequest",
+    "type": "object"
+   },
+   "Episode": {
+    "properties": {
+     "days": {
+      "title": "Days",
+      "type": "integer"
+     },
+     "end": {
+      "format": "date",
+      "title": "End",
+      "type": "string"
+     },
+     "max_drawdown_pct": {
+      "title": "Max Drawdown Pct",
+      "type": "number"
+     },
+     "nifty_change_pct": {
+      "title": "Nifty Change Pct",
+      "type": "number"
+     },
+     "ongoing": {
+      "title": "Ongoing",
+      "type": "boolean"
+     },
+     "regime": {
+      "enum": [
+       "Bull",
+       "Sideways",
+       "Crisis"
+      ],
+      "title": "Regime",
+      "type": "string"
+     },
+     "start": {
+      "format": "date",
+      "title": "Start",
+      "type": "string"
+     }
+    },
+    "required": [
+     "regime",
+     "start",
+     "end",
+     "days",
+     "nifty_change_pct",
+     "max_drawdown_pct",
+     "ongoing"
+    ],
+    "title": "Episode",
+    "type": "object"
+   },
+   "Episodes": {
+    "properties": {
+     "as_of": {
+      "format": "date",
+      "title": "As Of",
+      "type": "string"
+     },
+     "episodes": {
+      "items": {
+       "$ref": "#/components/schemas/Episode"
+      },
+      "title": "Episodes",
+      "type": "array"
+     },
+     "regime": {
+      "anyOf": [
+       {
+        "enum": [
+         "Bull",
+         "Sideways",
+         "Crisis"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Regime"
+     }
+    },
+    "required": [
+     "regime",
+     "as_of",
+     "episodes"
+    ],
+    "title": "Episodes",
+    "type": "object"
+   },
+   "ErrorBody": {
+    "properties": {
+     "error": {
+      "$ref": "#/components/schemas/ErrorDetail"
+     }
+    },
+    "required": [
+     "error"
+    ],
+    "title": "ErrorBody",
+    "type": "object"
+   },
+   "ErrorDetail": {
+    "properties": {
+     "code": {
+      "title": "Code",
+      "type": "string"
+     },
+     "message": {
+      "title": "Message",
+      "type": "string"
+     },
+     "request_id": {
+      "title": "Request Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "code",
+     "message",
+     "request_id"
+    ],
+    "title": "ErrorDetail",
+    "type": "object"
+   },
+   "Health": {
+    "properties": {
+     "checks": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "title": "Checks",
+      "type": "object"
+     },
+     "status": {
+      "enum": [
+       "ok",
+       "degraded"
+      ],
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "status",
+     "checks"
+    ],
+    "title": "Health",
+    "type": "object"
+   },
+   "History": {
+    "properties": {
+     "as_of": {
+      "format": "date",
+      "title": "As Of",
+      "type": "string"
+     },
+     "points": {
+      "items": {
+       "$ref": "#/components/schemas/HistoryPoint"
+      },
+      "title": "Points",
+      "type": "array"
+     },
+     "range": {
+      "enum": [
+       "60d",
+       "1y",
+       "5y",
+       "max"
+      ],
+      "title": "Range",
+      "type": "string"
+     }
+    },
+    "required": [
+     "range",
+     "as_of",
+     "points"
+    ],
+    "title": "History",
+    "type": "object"
+   },
+   "HistoryPoint": {
+    "properties": {
+     "close": {
+      "title": "Close",
+      "type": "number"
+     },
+     "confidence": {
+      "title": "Confidence",
+      "type": "number"
+     },
+     "date": {
+      "format": "date",
+      "title": "Date",
+      "type": "string"
+     },
+     "label": {
+      "enum": [
+       "Bull",
+       "Sideways",
+       "Crisis"
+      ],
+      "title": "Label",
+      "type": "string"
+     }
+    },
+    "required": [
+     "date",
+     "label",
+     "confidence",
+     "close"
+    ],
+    "title": "HistoryPoint",
+    "type": "object"
+   },
+   "ModelInfo": {
+    "properties": {
+     "status": {
+      "enum": [
+       "validated",
+       "experimental",
+       "retired"
+      ],
+      "title": "Status",
+      "type": "string"
+     },
+     "version": {
+      "title": "Version",
+      "type": "string"
+     }
+    },
+    "required": [
+     "version",
+     "status"
+    ],
+    "title": "ModelInfo",
+    "type": "object"
+   },
+   "NiftyStats": {
+    "properties": {
+     "as_of": {
+      "format": "date",
+      "title": "As Of",
+      "type": "string"
+     },
+     "change_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Change Pct"
+     },
+     "close": {
+      "title": "Close",
+      "type": "number"
+     },
+     "from_high_pct": {
+      "title": "From High Pct",
+      "type": "number"
+     },
+     "high_52w": {
+      "title": "High 52W",
+      "type": "number"
+     },
+     "low_52w": {
+      "title": "Low 52W",
+      "type": "number"
+     },
+     "ytd_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ytd Pct"
+     }
+    },
+    "required": [
+     "as_of",
+     "close",
+     "change_pct",
+     "high_52w",
+     "low_52w",
+     "from_high_pct",
+     "ytd_pct"
+    ],
+    "title": "NiftyStats",
+    "type": "object"
+   },
+   "Probabilities": {
+    "properties": {
+     "bull": {
+      "title": "Bull",
+      "type": "number"
+     },
+     "crisis": {
+      "title": "Crisis",
+      "type": "number"
+     },
+     "sideways": {
+      "title": "Sideways",
+      "type": "number"
+     }
+    },
+    "required": [
+     "bull",
+     "sideways",
+     "crisis"
+    ],
+    "title": "Probabilities",
+    "type": "object"
+   },
+   "Regime": {
+    "properties": {
+     "confidence": {
+      "description": "Model probability of `label` (0-1); overconfident by design",
+      "title": "Confidence",
+      "type": "number"
+     },
+     "days_in_regime": {
+      "title": "Days In Regime",
+      "type": "integer"
+     },
+     "label": {
+      "description": "Regime shown to users (changes after 2 consecutive days)",
+      "enum": [
+       "Bull",
+       "Sideways",
+       "Crisis"
+      ],
+      "title": "Label",
+      "type": "string"
+     },
+     "probabilities": {
+      "$ref": "#/components/schemas/Probabilities"
+     },
+     "raw_label": {
+      "description": "Most likely regime today; may differ during a change",
+      "enum": [
+       "Bull",
+       "Sideways",
+       "Crisis"
+      ],
+      "title": "Raw Label",
+      "type": "string"
+     },
+     "since": {
+      "format": "date",
+      "title": "Since",
+      "type": "string"
+     }
+    },
+    "required": [
+     "label",
+     "raw_label",
+     "confidence",
+     "probabilities",
+     "days_in_regime",
+     "since"
+    ],
+    "title": "Regime",
+    "type": "object"
+   },
+   "RegimeToday": {
+    "properties": {
+     "as_of": {
+      "format": "date",
+      "title": "As Of",
+      "type": "string"
+     },
+     "brief": {
+      "$ref": "#/components/schemas/Brief"
+     },
+     "disclaimer": {
+      "title": "Disclaimer",
+      "type": "string"
+     },
+     "is_stale": {
+      "title": "Is Stale",
+      "type": "boolean"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ModelInfo"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "nifty": {
+      "$ref": "#/components/schemas/NiftyStats"
+     },
+     "regime": {
+      "$ref": "#/components/schemas/Regime"
+     },
+     "signals": {
+      "items": {
+       "$ref": "#/components/schemas/Signal"
+      },
+      "title": "Signals",
+      "type": "array"
+     },
+     "signals_approximate": {
+      "description": "True when the explanation model disagrees today",
+      "title": "Signals Approximate",
+      "type": "boolean"
+     },
+     "warnings": {
+      "default": [],
+      "items": {
+       "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+     }
+    },
+    "required": [
+     "as_of",
+     "is_stale",
+     "regime",
+     "signals",
+     "signals_approximate",
+     "brief",
+     "nifty",
+     "model",
+     "disclaimer"
+    ],
+    "title": "RegimeToday",
+    "type": "object"
+   },
+   "Signal": {
+    "properties": {
+     "contribution": {
+      "title": "Contribution",
+      "type": "number"
+     },
+     "direction": {
+      "enum": [
+       "up",
+       "down"
+      ],
+      "title": "Direction",
+      "type": "string"
+     },
+     "feature": {
+      "title": "Feature",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "percentile": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Percentile"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     },
+     "value": {
+      "title": "Value",
+      "type": "number"
+     }
+    },
+    "required": [
+     "feature",
+     "name",
+     "value",
+     "direction",
+     "text",
+     "contribution"
+    ],
+    "title": "Signal",
+    "type": "object"
+   }
+  }
+ },
+ "info": {
+  "description": "Market-regime data and an educational AI analyst. Not investment advice.",
+  "title": "MarketMood API",
+  "version": "0.2.0"
+ },
+ "openapi": "3.1.0",
+ "paths": {
+  "/livez": {
+   "get": {
+    "description": "Liveness: the process is up. Never touches the database or other services.",
+    "operationId": "livez_livez_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": {
+          "type": "string"
+         },
+         "title": "Response Livez Livez Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Livez",
+    "tags": [
+     "health"
+    ]
+   }
+  },
+  "/readyz": {
+   "get": {
+    "operationId": "readyz_readyz_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Health"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "503": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Health"
+        }
+       }
+      },
+      "description": "Service Unavailable"
+     }
+    },
+    "summary": "Readyz",
+    "tags": [
+     "health"
+    ]
+   }
+  },
+  "/v1/chat": {
+   "post": {
+    "operationId": "chat_v1_chat_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ChatRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       },
+       "text/event-stream": {}
+      },
+      "description": "SSE stream (see module docs)"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorBody"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorBody"
+        }
+       }
+      },
+      "description": "Too Many Requests"
+     },
+     "503": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorBody"
+        }
+       }
+      },
+      "description": "Service Unavailable"
+     }
+    },
+    "summary": "Chat",
+    "tags": [
+     "chat"
+    ]
+   }
+  },
+  "/v1/regime/episodes": {
+   "get": {
+    "description": "Past stretches of the same confirmed regime, most recent first.",
+    "operationId": "get_episodes_v1_regime_episodes_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "regime",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "Bull",
+          "Sideways",
+          "Crisis"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Regime"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 20,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Episodes"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorBody"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "503": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorBody"
+        }
+       }
+      },
+      "description": "Service Unavailable"
+     }
+    },
+    "summary": "Get Episodes",
+    "tags": [
+     "regime"
+    ]
+   }
+  },
+  "/v1/regime/history": {
+   "get": {
+    "description": "Daily confirmed label, confidence and NIFTY close for the chart (at most 500 points).",
+    "operationId": "get_history_v1_regime_history_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "range",
+      "required": false,
+      "schema": {
+       "default": "1y",
+       "enum": [
+        "60d",
+        "1y",
+        "5y",
+        "max"
+       ],
+       "title": "Range",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/History"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorBody"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "503": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorBody"
+        }
+       }
+      },
+      "description": "Service Unavailable"
+     }
+    },
+    "summary": "Get History",
+    "tags": [
+     "regime"
+    ]
+   }
+  },
+  "/v1/regime/today": {
+   "get": {
+    "description": "Today's regime card: label, confidence, days in regime, signals, brief and NIFTY stats.",
+    "operationId": "get_today_v1_regime_today_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RegimeToday"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorBody"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "503": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorBody"
+        }
+       }
+      },
+      "description": "Service Unavailable"
+     }
+    },
+    "summary": "Get Today",
+    "tags": [
+     "regime"
+    ]
+   }
+  }
+ }
+}

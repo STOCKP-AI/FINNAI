@@ -102,11 +102,14 @@ def db_connection(url):
     """Open a connection; commit on success, roll back on error, always close.
 
     prepare_threshold=None disables server-side prepared statements, which the
-    Supabase pooler in transaction mode (port 6543) does not support.
+    Supabase pooler in transaction mode (port 6543) does not support. Floats are read exactly.
     """
     import psycopg
 
     conn = psycopg.connect(url, connect_timeout=15, prepare_threshold=None)
+    # Supabase's server default extra_float_digits = 0 sends floats with 15 significant digits;
+    # 3 sends them exactly, so a value read back is the value written.
+    conn.execute("SET extra_float_digits = 3")
     try:
         yield conn
         conn.commit()
