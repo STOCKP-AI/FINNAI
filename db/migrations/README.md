@@ -12,7 +12,7 @@ file in BEGIN/COMMIT: the runner applies each file in one transaction
 | `003_mark_regime_output_placeholder.sql` | Tags the Phase 2 regime rows `HMM_v1-placeholder` (audit A2) | 7 Oct 2026 |
 | `004_regime_model.sql` | `model_registry`, `pipeline_runs`; reshapes `regime_output` (probabilities, confirmed label, signals) and deletes the placeholder rows | 9 Oct 2026 |
 | `005_agent_tables.sql` | `agent_reader` role + read policies; `glossary`, `daily_briefs`, `chat_sessions`, `chat_messages`, `usage_daily`, `answer_cache` | 9 Oct 2026 |
-| `006_chat_feedback.sql` | `chat_feedback`: thumbs up / down on AI answers (CHAT-09), written only by the API | not yet |
+| `006_chat_feedback.sql` | `chat_feedback`: thumbs up / down on AI answers (CHAT-09), written only by the API | 9 Oct 2026 |
 
 Reference data lives in `db/seed/` (idempotent, re-runnable): `glossary.sql` (30 terms) after 005.
 
