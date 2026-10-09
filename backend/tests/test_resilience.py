@@ -197,7 +197,7 @@ def test_without_provider_extras_keeps_other_messages():
 # --- evals: busy provider is "not evaluated", not a failure -----------------------------------
 
 
-def test_eval_question_is_retried_once_then_marked_not_evaluated(monkeypatch):
+def test_eval_question_is_retried_twice_then_marked_not_evaluated(monkeypatch):
     calls, waits = [], []
 
     async def ask(llm, settings, question):
@@ -210,7 +210,7 @@ def test_eval_question_is_retried_once_then_marked_not_evaluated(monkeypatch):
     monkeypatch.setattr(evals, "ask", ask)
     case = {"id": "cur-1", "category": "current", "question": "q", "critical": True}
     results = asyncio.run(evals.run_cases([case], None, None, sleep=sleep, retry_wait=45))
-    assert len(calls) == 2 and waits == [60.0]
+    assert len(calls) == evals.QUESTION_ATTEMPTS == 3 and waits == [60.0, 60.0]
     r = results[0]
     assert r.unavailable and r.error
     summary = evals.summarise(results, judged=True)
