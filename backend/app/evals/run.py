@@ -50,7 +50,7 @@ NUMBER = re.compile(r"(?<![\w.])[-+]?\d[\d,]*(?:\.\d+)?")
 NOT_FACTS = re.compile(
     r"\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}[ -][A-Z][a-z]{2,8},?[ -]\d{4}\b|NIFTY\s*-?\s*50|\b(19|20)\d{2}\b"
     r"|\b\d+[- ](?:day|week|month|year|trading day|calendar week)s?\b"
-    r"|\b\d+\s?-?\s?(?:st|nd|rd|th)\b|\bmiddle\s+50\s*%|\bCOVID-?19\b",
+    r"|\b\d+\s?-?\s?(?:st|nd|rd|th)\b|\bmiddle[\s-]*50\s*%|\bCOVID-?19\b",
     re.IGNORECASE,
 )
 # Models write typographic dashes and spaces (non-breaking hyphen, en dash as minus, narrow

@@ -40,6 +40,7 @@ def test_typographic_dates_satisfy_the_date_rule():
         f"in the COVID{NBH}19 crash",
         f"25th{NBH}percentile and 75 th{NBH}percentile",
         f"the middle 50{NNBSP}% of outcomes",
+        f"The middle{NBH}50{NNBSP}% of episodes",
         f"between the 25{NBH}th and 75-th percentile",
         f"its 52{NBH}week high and its 60{NBH}day high",
         f"as of 08{NBH}Oct{NBH}2026",
@@ -79,6 +80,14 @@ def test_analyst_prompt_answers_advice_questions_with_context():
 
     rule = ANALYST.split("2. ", 1)[1].split("3. ", 1)[0]
     assert "get_current_regime" in rule and "get_forward_returns" in rule and "adviser" in rule
+    assert "rules of thumb" in rule  # allocation questions: no "100 minus your age"
+
+
+def test_age_rule_of_thumb_fails_the_allocation_question():
+    (case,) = evals.load_cases(only=["act-4"])
+    answer = "A common framework is 100 minus your age in equities."
+    failures = evals.check_rules(case, answer, [])
+    assert any(f.startswith("forbidden") for f in failures) and any(f.startswith("numbers") for f in failures)
 
 
 def test_plain_and_numbers_with_decimals():
