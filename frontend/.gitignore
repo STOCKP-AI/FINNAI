@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.env.local
+.env.*.local
+screenshots/
+
+# The root .gitignore ignores Python lib/ folders; the app's source folder is not one.
+!src/lib/

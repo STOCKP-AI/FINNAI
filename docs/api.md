@@ -120,6 +120,18 @@ data: {"message_id": 812, "session_id": "8a0f3c2e-…", "usage": {"in": 2140, "o
   after 90 s at most.
 - Before the stream starts, failures are normal JSON errors (429, 422, 503).
 
+## POST /v1/feedback
+
+Thumbs up / down on one AI answer (CHAT-09). Use the `session_id` and `message_id` from the
+chat's `done` event. A second click replaces the first.
+
+```json
+{"session_id": "8a0f3c2e-…", "message_id": 812, "rating": "up"}
+```
+
+`204 No Content` on success; `404 MM-REQ-003` if that answer is not in your own conversation;
+`422` for anything else in the body.
+
 ## Health
 
 `GET /livez` → `{"status": "ok", "version": "0.2.0"}` (no dependencies).

@@ -170,6 +170,32 @@ def test_chat_end_to_end_with_server_side_history(seeded):
     assert str(store.ensure_session(session, store_hash(c))) == session
 
 
+def test_feedback_on_own_answers_only(seeded):
+    """CHAT-09: thumbs up / down are stored once per answer, last click wins, own session only."""
+    c, _ = seeded
+    done = sse_events(c.post("/v1/chat", json={"message": "What regime is the market in today?"}).text)[-1][1]
+    body = {"session_id": done["session_id"], "message_id": done["message_id"]}
+
+    def rating():
+        with db.writer() as conn:
+            sql = "SELECT rating FROM chat_feedback WHERE message_id = %s"
+            row = db.fetch_one(conn, sql, (done["message_id"],))
+        return row and row["rating"]
+
+    assert c.post("/v1/feedback", json={**body, "rating": "up"}).status_code == 204 and rating() == 1
+    assert c.post("/v1/feedback", json={**body, "rating": "down"}).status_code == 204 and rating() == -1
+
+    stranger = "00000000-0000-4000-8000-000000000000"
+    other = c.post("/v1/feedback", json={**body, "session_id": stranger, "rating": "up"})
+    assert other.status_code == 404 and other.json()["error"]["code"] == "MM-REQ-003"
+    question = c.post("/v1/feedback", json={**body, "message_id": done["message_id"] - 1, "rating": "up"})
+    assert question.status_code == 404  # the user's own question cannot be rated
+    with db.writer() as conn, conn.cursor() as cur:
+        cur.execute("UPDATE chat_sessions SET client_hash = 'someone-else'")
+    assert c.post("/v1/feedback", json={**body, "rating": "up"}).status_code == 404  # another visitor
+    assert rating() == -1
+
+
 def test_quota_limit_and_refund(seeded):
     c, _ = seeded
     settings = make_settings(database_url=TEST_URL, chat_daily_limit=2)

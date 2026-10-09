@@ -16,7 +16,7 @@ import asyncio
 import json
 import logging
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -24,7 +24,7 @@ from app.agent import guard, store
 from app.agent.llm import LLMError, make_client
 from app.agent.orchestrator import Final, Orchestrator, Token, ToolEnd, ToolStart
 from app.agent.prompts import analyst_prompt
-from app.api.schemas import ChatRequest, ErrorBody
+from app.api.schemas import ChatRequest, ErrorBody, FeedbackRequest
 from app.core.client import client_hash
 from app.core.config import get_settings
 from app.core.errors import CODES, ApiError
@@ -113,6 +113,19 @@ async def chat(body: ChatRequest, request: Request, settings=Depends(get_setting
     agent = Orchestrator(llm, settings)
     events = agent.run(system, history, question)
     return _stream(_agent_events(events, who, session_id, question, quota_left, body.chip_id, regime_key))
+
+
+@router.post(
+    "/v1/feedback",
+    status_code=204,
+    responses={404: {"model": ErrorBody}, 422: {"model": ErrorBody}, 503: {"model": ErrorBody}},
+)
+async def feedback(body: FeedbackRequest, request: Request, settings=Depends(get_settings)):
+    """Thumbs up / down on one AI answer of your own conversation (CHAT-09); the last click wins."""
+    who = client_hash(request, settings)
+    rating = 1 if body.rating == "up" else -1
+    await run_in_threadpool(store.save_feedback, body.session_id, who, body.message_id, rating)
+    return Response(status_code=204)
 
 
 def _stream(generator):

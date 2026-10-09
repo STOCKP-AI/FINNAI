@@ -207,6 +207,38 @@
     "title": "ErrorDetail",
     "type": "object"
    },
+   "FeedbackRequest": {
+    "additionalProperties": false,
+    "properties": {
+     "message_id": {
+      "description": "The message_id from the chat's done event",
+      "minimum": 1.0,
+      "title": "Message Id",
+      "type": "integer"
+     },
+     "rating": {
+      "enum": [
+       "up",
+       "down"
+      ],
+      "title": "Rating",
+      "type": "string"
+     },
+     "session_id": {
+      "description": "The session_id from the chat's done event",
+      "format": "uuid",
+      "title": "Session Id",
+      "type": "string"
+     }
+    },
+    "required": [
+     "session_id",
+     "message_id",
+     "rating"
+    ],
+    "title": "FeedbackRequest",
+    "type": "object"
+   },
    "Health": {
     "properties": {
      "checks": {
@@ -697,6 +729,61 @@
      }
     },
     "summary": "Chat",
+    "tags": [
+     "chat"
+    ]
+   }
+  },
+  "/v1/feedback": {
+   "post": {
+    "description": "Thumbs up / down on one AI answer of your own conversation (CHAT-09); the last click wins.",
+    "operationId": "feedback_v1_feedback_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FeedbackRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorBody"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorBody"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "503": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorBody"
+        }
+       }
+      },
+      "description": "Service Unavailable"
+     }
+    },
+    "summary": "Feedback",
     "tags": [
      "chat"
     ]

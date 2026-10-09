@@ -2,7 +2,8 @@
 
 Run locally:  uv run uvicorn app.main:app --reload     (docs at http://localhost:8000/docs)
 
-Endpoints: /livez, /readyz, /v1/regime/{today,history,episodes}, POST /v1/chat (SSE).
+Endpoints: /livez, /readyz, /v1/regime/{today,history,episodes}, POST /v1/chat (SSE),
+POST /v1/feedback.
 Configuration: environment variables / .env files (app/core/config.py).
 """
 
