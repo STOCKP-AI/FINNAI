@@ -3,9 +3,10 @@
 Agentic AI market-regime detection for Indian retail investors: an HMM on NIFTY 50
 data, SHAP-based signals and an educational AI chat.
 
-> Status: Phase 3 done. `regime_output` holds causal labels from model `hmm-20261008-c2`,
-> status **experimental**: 5 of 6 reference periods, but macro-F1 0.55 against the 0.60
-> target ([validation](docs/validation.md), [decisions](docs/adr/0001-regime-model.md)).
+> Status: Phase 4: regime API and AI analyst ([API contract](docs/api.md),
+> [decisions](docs/adr/0002-ai-analyst.md)); the real-model quality check (Gate G3) runs with
+> `uv run mm-evals` once the free AI keys are set. The model `hmm-20261008-c2` is **experimental**:
+> 5 of 6 reference periods, macro-F1 0.55 against the 0.60 target ([validation](docs/validation.md)).
 
 ## Repository layout
 
@@ -18,7 +19,8 @@ ml/                      data pipeline + model (Python package marketmood_ml)
   pipelines/data/        Yahoo snapshot CSVs used as test fixtures
   legacy/                Phase 2 training script, kept for reference only
   notebooks/  data/      exploration notebooks; local data (not committed)
-backend/                 FastAPI app (package app); only /livez until Phase 4
+backend/                 FastAPI app (package app): regime API, AI analyst, brief, evals
+  app/{api,agent,services,core}/  routes, LLM adapter + tools + tool loop, queries, settings
 frontend/                web app (Phase 5; framework decision pending)
 db/migrations/           numbered SQL migrations, applied in order
 docs/                    project documentation
@@ -53,6 +55,9 @@ pyproject.toml, uv.lock  workspace definition and locked versions for everyone
 5. **LightGBM** (explanations) needs a system library: on macOS run `brew install libomp`
    once; on Windows it uses the Microsoft Visual C++ Redistributable (x64), which most
    machines already have. Check: `uv run python -c "import lightgbm"`.
+6. **AI analyst keys** (free, no billing account): create `backend/.env` with `LLM_PROVIDER`,
+   `LLM_API_KEY` (Google AI Studio), `JUDGE_PROVIDER=groq`, `JUDGE_API_KEY` (Groq) and
+   `IP_HASH_PEPPER` - see `.env.example`. Without keys, `LLM_PROVIDER=mock` works offline.
 
 ## Daily commands
 
@@ -68,7 +73,9 @@ uv run mm-train                    # retrain: pre-registered sweep, report (see 
 uv run mm-register ml/models/<version>  # make a committed model the active one (fresh database)
 uv run pytest                      # all tests (integration tests skip without a test DB)
 uv run ruff check . ; uv run ruff format .
-uv run uvicorn app.main:app --reload   # API on http://localhost:8000/livez
+uv run uvicorn app.main:app --reload   # API on http://localhost:8000 (docs at /docs)
+uv run mm-brief                    # today's dashboard brief (AI, checked; template fallback)
+uv run mm-evals                    # golden questions -> docs/evals.md (needs AI keys)
 ```
 
 Adding a library: `uv add --package marketmood-ml <name>` (or `marketmood-backend`),
@@ -88,6 +95,9 @@ Exit codes: 0 success (including "no new data" on holidays); 1 known failure wit
 | `MM-MODEL-003` | no active model in `model_registry` |
 | `MM-MODEL-004` | a model version already exists with different files |
 | `MM-CONFIG-002` | LightGBM could not load its system library (see Getting started, step 5) |
+
+API and chat codes (`MM-REQ-*`, `MM-QUOTA-001`, `MM-LLM-*`, `MM-TOOL-001`, `MM-CFG-001`) are
+listed in [docs/api.md](docs/api.md).
 
 ## Tests
 
@@ -112,6 +122,8 @@ Exit codes: 0 success (including "no new data" on holidays); 1 known failure wit
 | TC-ML-09 | a one-day flip does not change the confirmed label |
 | TC-ML-11 | the backtest changes with an extra day of delay and reruns are identical |
 | Idempotency | `mm-infer` twice writes nothing the second time; `mm-nightly` logs one `pipeline_runs` row |
+| TC-API-01…06, 08 | today's card (as_of, is_stale), stale data, history ≤ 500 points, 422 on bad range, 413 on big bodies, exact CORS, OpenAPI snapshot |
+| TC-AGT-01…10 | tool use, refusals and injection (mock + evals), numbers grounded, tool errors, 5-round cap, server-side history, image stripping, brief number check |
 
 Integration tests need `TEST_DATABASE_URL` pointing at a **disposable** Postgres with the
 migrations applied (CI does this automatically); they refuse to run against Supabase.
