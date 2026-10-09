@@ -1,0 +1,137 @@
+@import "tailwindcss";
+@import "@fontsource-variable/manrope";
+
+/* MarketMood theme: black canvas, a glowing navy glass card, cyan/indigo light, regime colours
+   validated for this surface (src/lib/format.ts). Dark only by design. */
+@theme {
+  --font-sans: "Manrope Variable", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+
+  --color-canvas: #000000;
+  --color-card: #040817;
+  --color-panel: #0a1730;
+  --color-panel-hi: #0c4a6e;
+  --color-tile: #0e1c3d;
+  --color-line: rgb(96 165 250 / 0.18);
+  --color-ink: #f1f5f9;
+  --color-ink-2: #b6c2d6;
+  --color-ink-3: #8593ad;
+  --color-glow: #0ea5e9;
+  --color-violet: #6d5dfc;
+  --color-live: #22c55e;
+  --color-warn: #f5b13d;
+
+  --color-bull: #199e70;
+  --color-sideways: #9085e9;
+  --color-crisis: #e66767;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  html {
+    background: var(--color-canvas);
+  }
+  body {
+    @apply min-h-dvh bg-canvas font-sans text-ink antialiased;
+    background:
+      radial-gradient(60rem 40rem at 12% 22%, rgb(14 116 144 / 0.22), transparent 60%),
+      radial-gradient(50rem 30rem at 85% 70%, rgb(67 56 202 / 0.12), transparent 65%),
+      var(--color-canvas);
+    background-attachment: fixed;
+  }
+  :focus-visible {
+    outline: 2px solid #7dd3fc;
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+  }
+}
+
+@layer components {
+  /* The big glowing card from the reference design. */
+  .glass-card {
+    @apply rounded-[1.75rem] border border-sky-400/20 bg-card;
+    background-image: linear-gradient(160deg, rgb(8 20 48 / 0.95), rgb(3 5 18 / 0.98) 55%);
+    box-shadow:
+      0 0 0 1px rgb(14 165 233 / 0.06),
+      0 0 60px -8px rgb(14 165 233 / 0.35),
+      0 0 140px -30px rgb(56 189 248 / 0.35);
+  }
+  /* Inner panels: a lit top-left edge fading into navy. */
+  .panel {
+    @apply relative overflow-hidden rounded-2xl border border-line;
+    background-image: linear-gradient(170deg, rgb(12 74 110 / 0.75), rgb(9 30 60 / 0.75) 45%, rgb(5 10 28 / 0.9));
+  }
+  .panel-soft {
+    @apply relative overflow-hidden rounded-2xl border border-line;
+    background-image: linear-gradient(180deg, rgb(15 40 72 / 0.8), rgb(6 12 32 / 0.95));
+  }
+  .tile {
+    @apply rounded-2xl border border-line bg-tile/80;
+  }
+  /* The teal-to-navy pills under the card. */
+  .chip {
+    @apply rounded-xl border border-cyan-300/20 text-left text-sm text-ink transition;
+    background-image: linear-gradient(90deg, rgb(13 72 84 / 0.9), rgb(5 14 46 / 0.95));
+    box-shadow: 0 0 22px -6px rgb(34 211 238 / 0.35);
+  }
+  .chip:hover:not(:disabled) {
+    @apply border-cyan-300/45;
+    box-shadow: 0 0 30px -4px rgb(34 211 238 / 0.5);
+  }
+  .chip:disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+  .ask-bar {
+    @apply rounded-xl border border-indigo-400/30;
+    background-image: linear-gradient(90deg, rgb(30 16 72 / 0.95), rgb(30 42 107 / 0.9));
+  }
+  .outline-box {
+    @apply rounded-3xl border border-white/15;
+  }
+  .eyebrow {
+    @apply text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-ink-3;
+  }
+}
+
+/* AI answers rendered from Markdown (no raw HTML, no images: src/components/Markdown.tsx). */
+.prose-ai {
+  @apply text-[0.95rem] leading-relaxed text-ink-2;
+}
+.prose-ai p {
+  @apply my-2;
+}
+.prose-ai strong {
+  @apply font-semibold text-ink;
+}
+.prose-ai ul {
+  @apply my-2 list-disc pl-5;
+}
+.prose-ai ol {
+  @apply my-2 list-decimal pl-5;
+}
+.prose-ai li {
+  @apply my-1;
+}
+.prose-ai a {
+  @apply text-sky-300 underline underline-offset-2;
+}
+.prose-ai table {
+  @apply my-3 w-full border-collapse text-sm;
+}
+.prose-ai th,
+.prose-ai td {
+  @apply border border-white/10 px-2 py-1 text-left;
+}
+.prose-ai code {
+  @apply rounded bg-white/10 px-1 py-0.5 text-[0.85em];
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

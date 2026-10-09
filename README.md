@@ -3,10 +3,10 @@
 Agentic AI market-regime detection for Indian retail investors: an HMM on NIFTY 50
 data, SHAP-based signals and an educational AI chat.
 
-> Status: Phase 4: regime API and AI analyst ([API contract](docs/api.md),
-> [decisions](docs/adr/0002-ai-analyst.md)); the real-model quality check (Gate G3) runs with
-> `uv run mm-evals` once the free AI keys are set. The model `hmm-20261008-c2` is **experimental**:
-> 5 of 6 reference periods, macro-F1 0.55 against the 0.60 target ([validation](docs/validation.md)).
+> Status: Phase 5: web app in `frontend/` (React + TypeScript) on top of the Phase 4 API
+> ([API contract](docs/api.md)); the AI analyst passed Gate G3 on 9 Oct 2026
+> ([evals](docs/evals.md)). The model `hmm-20261008-c2` is **experimental**: 5 of 6 reference
+> periods, macro-F1 0.55 against the 0.60 target ([validation](docs/validation.md)).
 
 ## Repository layout
 
@@ -21,7 +21,7 @@ ml/                      data pipeline + model (Python package marketmood_ml)
   notebooks/  data/      exploration notebooks; local data (not committed)
 backend/                 FastAPI app (package app): regime API, AI analyst, brief, evals
   app/{api,agent,services,core}/  routes, LLM adapter + tools + tool loop, queries, settings
-frontend/                web app (Phase 5; framework decision pending)
+frontend/                web app: React + TypeScript + Vite + Tailwind (see frontend/README.md)
 db/migrations/           numbered SQL migrations, applied in order
 docs/                    project documentation
 .github/workflows/       CI, Supabase keep-alive, manual data pipeline
@@ -59,6 +59,9 @@ pyproject.toml, uv.lock  workspace definition and locked versions for everyone
    `LLM_API_KEY` (Google AI Studio), `LLM_FALLBACK_PROVIDER=groq` + `LLM_FALLBACK_API_KEY` (used
    when Gemini is busy), `JUDGE_PROVIDER=groq`, `JUDGE_API_KEY` (Groq) and `IP_HASH_PEPPER` -
    see `.env.example`. Without keys, `LLM_PROVIDER=mock` works offline.
+7. **Frontend** (web app): install Node.js 22 LTS (https://nodejs.org), then
+   `cd frontend`, `npm ci`, `copy .env.example .env.local` (macOS: `cp`) and `npm run dev`
+   → http://localhost:5173, with the API running on port 8000. Details: `frontend/README.md`.
 
 ## Daily commands
 
@@ -125,6 +128,8 @@ listed in [docs/api.md](docs/api.md).
 | Idempotency | `mm-infer` twice writes nothing the second time; `mm-nightly` logs one `pipeline_runs` row |
 | TC-API-01…06, 08 | today's card (as_of, is_stale), stale data, history ≤ 500 points, 422 on bad range, 413 on big bodies, exact CORS, OpenAPI snapshot |
 | TC-AGT-01…10 | tool use, refusals and injection (mock + evals), numbers grounded, tool errors, 5-round cap, server-side history, image stripping, brief number check |
+| CHAT-09 | feedback is stored once per answer, last click wins, only for answers in your own session |
+| TC-FE-01…06, TC-AGT-09/11 | frontend: regime card per regime, error card with reference, stale banner, streaming chat with tool chip + Stop + feedback, 360/1280 px without sideways scroll, axe, safe Markdown, AI label (`frontend/README.md`) |
 
 Integration tests need `TEST_DATABASE_URL` pointing at a **disposable** Postgres with the
 migrations applied (CI does this automatically); they refuse to run against Supabase.
@@ -133,7 +138,7 @@ migrations applied (CI does this automatically); they refuse to run against Supa
 
 | Workflow | When | Needs |
 |---|---|---|
-| CI | every pull request and push to `main`: lockfile, ruff, migrations on Postgres 17, tests with coverage (ml ≥ 85%, backend ≥ 80%) | nothing |
+| CI | every pull request and push to `main`: lockfile, ruff, migrations on Postgres 17, tests with coverage (ml ≥ 85%, backend ≥ 80%); frontend lint, type check, Vitest, Playwright E2E + axe | nothing |
 | Supabase keep-alive | Monday and Thursday 08:47 IST, or manually | secret `DATABASE_URL` |
 | Data pipeline | manually (Actions → Data pipeline → Run workflow); nightly from Phase 6. Does not refresh `regime_output` yet: run `uv run mm-infer` afterwards | secret `DATABASE_URL` |
 
