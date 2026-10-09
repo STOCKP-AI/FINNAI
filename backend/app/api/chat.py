@@ -92,7 +92,7 @@ async def chat(body: ChatRequest, request: Request, settings=Depends(get_setting
     llm_config = settings.llm()
     if llm_config.problem and _llm_override is None:
         raise ApiError("MM-CFG-001", "The AI analyst is not configured yet.")
-    llm = _llm_override or make_client(llm_config)
+    llm = _llm_override or make_client(llm_config, settings.llm_fallback())
     who = client_hash(request, settings)
     question = CHIPS[body.chip_id] if body.chip_id else body.message.strip()
     session_id = await run_in_threadpool(store.ensure_session, body.session_id, who)

@@ -85,7 +85,7 @@ def run(args):
             if config.problem:
                 log.warning("MM-CFG-001: %s; writing the template brief.", config.problem)
             else:
-                llm = make_client(config)
+                llm = make_client(config, settings.llm_fallback())
         text, changed, source, model, _ = make_brief(rows, llm)
         day = rows[-1]["date"]
         log.info("Brief for %s (%s):\n%s\nWhat changed: %s", day, source, text, changed)

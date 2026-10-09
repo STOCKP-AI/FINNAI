@@ -27,6 +27,12 @@ Build Plan v2.1 section 8.3). The team is small and the laptops are modest.
 - **7 tools, strict and small.** Arguments are validated in code (the model is not trusted);
   results are rounded JSON; a failed tool tells the model "unavailable" (MM-TOOL-001) instead
   of raising. History for the LLM is downsampled to 120 points.
+- **Busy providers.** Free tiers answer HTTP 503 (overloaded) and 429 (rate limit) often. The
+  adapter retries a call that has produced nothing yet (after 2 s and 6 s, or the provider's own
+  retry delay up to 10 s), then switches to the fallback model (`LLM_FALLBACK_*`, Groq) for the
+  rest of that request; Gemini's thought signatures are removed from what the fallback sees.
+  `mm-evals` waits 45 s and retries a question once; a question the provider still cannot answer
+  is "not evaluated" and the run is INCOMPLETE, not a quality failure.
 - **Tool loop** up to 5 rounds, then one answer without tools (MM-LLM-004); answers stream as
   SSE with tool activity, a 15-second heartbeat and a 90-second cap.
 - **Server-side history.** The client sends only `session_id` + the new message (unknown fields

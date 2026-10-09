@@ -3,7 +3,11 @@
 Usage (needs DATABASE_URL; for real models LLM_* and, for scores, JUDGE_* in backend/.env):
     uv run mm-evals                       # all questions, report to docs/evals.md
     uv run mm-evals --only cur-1 adv-2    # a few questions
-    uv run mm-evals --delay 8             # seconds between questions (free-tier rate limits)
+    uv run mm-evals --delay 30            # seconds between questions (free-tier rate limits)
+
+A question the AI provider could not answer (busy or rate-limited even after retries and the
+fallback model) is retried once after a pause; if it still fails it is "not evaluated" and the
+run is INCOMPLETE rather than a quality failure - run it again later.
 
 Rule checks (pass/fail): expected tool called, forbidden / required patterns, <= 180 words,
 every number found in the tool results, no system-prompt leak. A failed rule on a question
@@ -38,6 +42,7 @@ GOLDEN = Path(__file__).with_name("golden.yaml")
 REPORT = REPO_ROOT / "docs" / "evals.md"
 MAX_WORDS = 180
 GATE_AVERAGE = 4.2
+RETRY_WAIT_S = 45.0  # free-tier per-minute limits reset within a minute
 
 NUMBER = re.compile(r"(?<![\w.])[-+]?\d[\d,]*(?:\.\d+)?")
 NOT_FACTS = re.compile(
@@ -65,6 +70,8 @@ class Result:
     failures: list = field(default_factory=list)
     scores: dict | None = None
     error: str | None = None
+    unavailable: bool = False  # the AI provider was busy / rate-limited: not a quality failure
+    model: str | None = None
     seconds: float = 0.0
 
     @property
@@ -166,23 +173,39 @@ async def judge(judge_llm, question, tools, answer):
     return scores
 
 
-async def run_cases(cases, llm, settings, judge_llm=None, delay=0.0):
+async def run_case(case, llm, settings, judge_llm):
+    r = Result(case)
+    final = await ask(llm, settings, case["question"])
+    r.answer, r.tools, r.model = final.text.strip(), final.tools, final.model
+    r.failures = check_rules(case, r.answer, r.tools)
+    if judge_llm is not None:
+        r.scores = await judge(judge_llm, case["question"], r.tools, r.answer)
+    return r
+
+
+async def run_cases(cases, llm, settings, judge_llm=None, delay=0.0, retry_wait=RETRY_WAIT_S, sleep=None):
+    sleep = sleep or asyncio.sleep
     results = []
     for i, case in enumerate(cases):
         if i and delay:
-            await asyncio.sleep(delay)
-        r = Result(case)
+            await sleep(delay)
         started = time.perf_counter()
-        try:
-            final = await ask(llm, settings, case["question"])
-            r.answer, r.tools = final.text.strip(), final.tools
-            r.failures = check_rules(case, r.answer, r.tools)
-            if judge_llm is not None:
-                r.scores = await judge(judge_llm, case["question"], r.tools, r.answer)
-        except (LLMError, ValueError, KeyError) as exc:
-            r.error = str(exc)
+        for attempt in (1, 2):
+            try:
+                r = await run_case(case, llm, settings, judge_llm)
+                break
+            except LLMError as exc:
+                r = Result(case, error=str(exc), unavailable=exc.retryable)
+                if not exc.retryable or attempt == 2:
+                    break
+                wait = min(max(retry_wait, exc.retry_after_s or 0), 120)
+                log.info("%s: AI provider busy (%s); trying again in %.0f s", case["id"], exc, wait)
+                await sleep(wait)
+            except (ValueError, KeyError) as exc:
+                r = Result(case, error=str(exc))
+                break
         r.seconds = round(time.perf_counter() - started, 1)
-        status = "ERROR" if r.error else ("FAIL" if r.failures else "pass")
+        status = "SKIP" if r.unavailable else "ERROR" if r.error else ("FAIL" if r.failures else "pass")
         log.info("%-6s %-5s %s %s", case["id"], status, r.score or "", "; ".join(r.failures) or r.error or "")
         results.append(r)
     return results
@@ -193,13 +216,17 @@ def summarise(results, judged):
     average = round(sum(scored) / len(scored), 2) if scored else None
     critical = [r for r in results if r.critical]
     passed = sum(1 for r in results if not r.failures and not r.error)
+    unavailable = sum(1 for r in results if r.unavailable)
+    critical = [r for r in critical if not r.unavailable]  # not answered is not a quality failure
     gate = not critical and (average is not None and average >= GATE_AVERAGE) if judged else not critical
     return {
         "average": average,
         "critical": len(critical),
         "passed": passed,
+        "not_evaluated": unavailable,
         "total": len(results),
-        "gate": gate,
+        "gate": gate and not unavailable,
+        "complete": not unavailable,
     }
 
 
@@ -213,16 +240,19 @@ def report(results, summary, model, judge_model):
         f"judge `{judge_model or 'none'}`",
         f"- Rule checks passed: {summary['passed']} of {summary['total']}; "
         f"critical failures: {summary['critical']}",
+        f"- Not evaluated (AI provider busy or rate-limited): {summary.get('not_evaluated', 0)}",
         f"- Judge average: {summary['average'] if summary['average'] is not None else 'not scored'} "
-        f"(Gate G3 needs >= {GATE_AVERAGE} and 0 critical failures): "
-        f"**{'PASS' if summary['gate'] else 'FAIL'}**",
+        f"(Gate G3 needs >= {GATE_AVERAGE}, 0 critical failures and every question answered): "
+        f"**{_verdict(summary)}**",
         "",
         "| Id | Category | Score | Tools | Result |",
         "|---|---|---|---|---|",
     ]
     for r in results:
         tools = ", ".join(sorted({t["name"] for t in r.tools})) or "-"
-        verdict = r.error or "; ".join(r.failures) or "pass"
+        verdict = ("not evaluated: " if r.unavailable else "") + (r.error or "; ".join(r.failures) or "pass")
+        if r.model and r.model != model and not r.error:
+            verdict += f" (answered by {r.model})"
         mark = " (critical)" if r.critical else ""
         lines.append(
             f"| {r.case['id']} | {r.case['category']} | {r.score or '-'} | {tools} | {verdict}{mark} |"
@@ -235,22 +265,36 @@ def report(results, summary, model, judge_model):
     return "\n".join(lines) + "\n"
 
 
+def _verdict(summary):
+    if summary["gate"]:
+        return "PASS"
+    return "INCOMPLETE - run again later" if not summary.get("complete", True) else "FAIL"
+
+
 def run(args):
     settings = get_settings()
     config = settings.llm()
     if config.problem:
         log.error("MM-CFG-001: %s", config.problem)
         return 1
-    llm = make_client(config)
+    llm = make_client(config, settings.llm_fallback())
     judge_config = settings.judge()
     judge_llm = make_client(judge_config) if judge_config and not judge_config.problem else None
     if judge_llm is None:
         log.warning("No judge model configured (JUDGE_*): rule checks only.")
+    else:
+        fallback = settings.llm_fallback()
+        answering = {config.model} | ({fallback.model} if fallback else set())
+        if judge_config.model in answering:
+            log.warning(
+                "The judge %s is also an answering model; set JUDGE_MODEL to another model.",
+                judge_config.model,
+            )
     db.open_pool(settings)
     try:
         db.get_pool().wait(timeout=15)
         cases = load_cases(args.golden, args.only)
-        results = asyncio.run(run_cases(cases, llm, settings, judge_llm, args.delay))
+        results = asyncio.run(run_cases(cases, llm, settings, judge_llm, args.delay, args.retry_wait))
     finally:
         db.close_pool()
     summary = summarise(results, judge_llm is not None)
@@ -270,7 +314,10 @@ def main(argv=None):
     p.add_argument("--golden", default=str(GOLDEN))
     p.add_argument("--out", default=str(REPORT))
     p.add_argument("--only", nargs="*", help="question ids to run")
-    p.add_argument("--delay", type=float, default=6.0, help="seconds between questions (default 6)")
+    p.add_argument("--delay", type=float, default=20.0, help="seconds between questions (default 20)")
+    p.add_argument(
+        "--retry-wait", type=float, default=RETRY_WAIT_S, help="pause before retrying a busy question"
+    )
     return run(p.parse_args(argv))
 
 
