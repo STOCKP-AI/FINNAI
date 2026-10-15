@@ -3,10 +3,12 @@
 Agentic AI market-regime detection for Indian retail investors: an HMM on NIFTY 50
 data, SHAP-based signals and an educational AI chat.
 
-> Status: Phase 5: web app in `frontend/` (React + TypeScript) on top of the Phase 4 API
-> ([API contract](docs/api.md)); the AI analyst passed Gate G3 on 9 Oct 2026
-> ([evals](docs/evals.md)). The model `hmm-20261008-c2` is **experimental**: 5 of 6 reference
-> periods, macro-F1 0.55 against the 0.60 target ([validation](docs/validation.md)).
+> Status: Phase 6: deployment on Render (API) and Cloudflare Pages (website), nightly pipeline
+> and brief in GitHub Actions ([deploy guide](docs/deploy.md), [user testing](docs/user-testing.md)).
+> The web app (Phase 5) runs on the Phase 4 API ([API contract](docs/api.md)); the AI analyst
+> passed Gate G3 on 9 Oct 2026 ([evals](docs/evals.md)). The model `hmm-20261008-c2` is
+> **experimental**: 5 of 6 reference periods, macro-F1 0.55 against the 0.60 target
+> ([validation](docs/validation.md)).
 
 ## Repository layout
 
@@ -21,10 +23,12 @@ ml/                      data pipeline + model (Python package marketmood_ml)
   notebooks/  data/      exploration notebooks; local data (not committed)
 backend/                 FastAPI app (package app): regime API, AI analyst, brief, evals
   app/{api,agent,services,core}/  routes, LLM adapter + tools + tool loop, queries, settings
+  Dockerfile             the API image (Render, later Cloud Run); render.yaml at the root
 frontend/                web app: React + TypeScript + Vite + Tailwind (see frontend/README.md)
 db/migrations/           numbered SQL migrations, applied in order
 docs/                    project documentation
-.github/workflows/       CI, Supabase keep-alive, manual data pipeline
+.github/workflows/       CI, nightly data pipeline, keep-alive, AI evaluation, Lighthouse, demo warm-up
+render.yaml              Render Blueprint for the API (see docs/deploy.md)
 pyproject.toml, uv.lock  workspace definition and locked versions for everyone
 ```
 
@@ -129,7 +133,10 @@ listed in [docs/api.md](docs/api.md).
 | TC-API-01…06, 08 | today's card (as_of, is_stale), stale data, history ≤ 500 points, 422 on bad range, 413 on big bodies, exact CORS, OpenAPI snapshot |
 | TC-AGT-01…10 | tool use, refusals and injection (mock + evals), numbers grounded, tool errors, 5-round cap, server-side history, image stripping, brief number check |
 | CHAT-09 | feedback is stored once per answer, last click wins, only for answers in your own session |
+| TC-SEC-03 | a forged `X-Forwarded-For` entry does not change who the caller is (no fresh chat quota) |
+| TC-QUO-04 (prototype) | all visitors together stop at `CHAT_GLOBAL_DAILY_LIMIT` (`MM-QUOTA-003`); refused chats count nowhere |
 | TC-FE-01…06, TC-AGT-09/11 | frontend: regime card per regime, error card with reference, stale banner, streaming chat with tool chip + Stop + feedback, 360/1280 px without sideways scroll, axe, safe Markdown, AI label (`frontend/README.md`) |
+| TC-SEC-05, TC-FE-07 | production security headers and CSP in the E2E run; Lighthouse on the deployed site (Actions → Lighthouse) |
 
 Integration tests need `TEST_DATABASE_URL` pointing at a **disposable** Postgres with the
 migrations applied (CI does this automatically); they refuse to run against Supabase.
@@ -138,12 +145,15 @@ migrations applied (CI does this automatically); they refuse to run against Supa
 
 | Workflow | When | Needs |
 |---|---|---|
-| CI | every pull request and push to `main`: lockfile, ruff, migrations on Postgres 17, tests with coverage (ml ≥ 85%, backend ≥ 80%); frontend lint, type check, Vitest, Playwright E2E + axe | nothing |
-| Supabase keep-alive | Monday and Thursday 08:47 IST, or manually | secret `DATABASE_URL` |
-| Data pipeline | manually (Actions → Data pipeline → Run workflow); nightly from Phase 6. Does not refresh `regime_output` yet: run `uv run mm-infer` afterwards | secret `DATABASE_URL` |
+| CI | every pull request and push to `main`: lockfile, ruff, migrations on Postgres 17, tests with coverage (ml ≥ 85%, backend ≥ 80%); the API's Docker image builds and starts; frontend lint, type check, Vitest, Playwright E2E + axe + CSP | nothing |
+| Data pipeline | weekdays 19:37 IST + 23:07 IST retry, or manually: ingest → features → regime labels → daily brief | `DATABASE_URL`; `LLM_API_KEY`, `LLM_FALLBACK_API_KEY` for the AI brief (template without them) |
+| Supabase keep-alive | Monday and Thursday 08:47 IST, or manually | `DATABASE_URL` |
+| AI evaluation | manually: golden questions, judge scores, report as an artifact (Gate G3) | `DATABASE_URL`, `LLM_API_KEY`, `LLM_FALLBACK_API_KEY`, `JUDGE_API_KEY` |
+| Lighthouse | manually, with the site address (TC-FE-07) | nothing |
+| Demo warm-up | manually before a demo: wakes the API, caches the suggested questions | nothing |
 
-Add the secret under Settings → Secrets and variables → Actions → New repository
-secret, name `DATABASE_URL`, value = the Session pooler string.
+Add secrets under Settings → Secrets and variables → Actions → New repository secret
+(`DATABASE_URL` = the Session pooler string). Deployment steps: [docs/deploy.md](docs/deploy.md).
 
 ## Database changes
 

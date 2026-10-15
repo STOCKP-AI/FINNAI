@@ -8,6 +8,7 @@ Configuration: environment variables / .env files (app/core/config.py).
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -19,7 +20,10 @@ from app.core import errors
 from app.core.config import get_settings
 from app.core.middleware import ApiMiddleware
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-7s %(name)s: %(message)s")
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),  # set in the environment (Render), not in .env
+    format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+)
 
 
 def create_app(settings=None, open_db=True):

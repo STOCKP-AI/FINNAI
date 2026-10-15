@@ -1,0 +1,50 @@
+# Render Blueprint: the MarketMood API on Render's free plan (prototype hosting).
+# Render dashboard -> New -> Blueprint -> pick this repository. Render asks for every
+# "sync: false" value once (paste them from your password manager); see docs/deploy.md.
+# Values are never stored in this file. The free instance sleeps after 15 minutes without
+# traffic and takes about a minute to wake; the website shows "Waking up the server" meanwhile.
+services:
+  - type: web
+    name: marketmood-api
+    runtime: docker
+    plan: free
+    region: singapore  # nearest Render region to Supabase (Mumbai)
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /livez  # /readyz would fail the deploy whenever Supabase is down
+    autoDeployTrigger: checksPass  # deploy main only after CI is green
+    buildFilter:
+      paths:
+        - backend/app/**
+        - backend/pyproject.toml
+        - backend/Dockerfile
+        - pyproject.toml
+        - uv.lock
+        - render.yaml
+    envVars:
+      - key: DATABASE_URL  # Supabase -> Connect -> Session pooler (port 5432)
+        sync: false
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: LLM_API_KEY  # Google AI Studio key (free tier, no billing account)
+        sync: false
+      - key: LLM_FALLBACK_PROVIDER
+        value: groq
+      - key: LLM_FALLBACK_API_KEY  # Groq key (free plan)
+        sync: false
+      - key: IP_HASH_PEPPER  # random secret made by Render once; keeps chat limits stable
+        generateValue: true
+      - key: CORS_ORIGINS  # the website's exact address, e.g. https://marketmood.pages.dev
+        sync: false
+      - key: TRUST_PROXY_HEADERS  # read the visitor's address from X-Forwarded-For
+        value: "true"
+      - key: PROXY_HOPS  # entries Render's proxies append (checked after the first deploy)
+        value: "1"
+      - key: CHAT_DAILY_LIMIT
+        value: "10"
+      - key: CHAT_GLOBAL_DAILY_LIMIT
+        value: "300"
+      - key: NSE_HOLIDAYS  # NSE equity holidays 2026, so holidays are not shown as stale data
+        value: "2026-01-15,2026-01-26,2026-03-03,2026-03-26,2026-03-31,2026-04-03,2026-04-14,2026-05-01,2026-05-28,2026-06-26,2026-09-14,2026-10-02,2026-10-20,2026-11-10,2026-11-24,2026-12-25"
+      - key: LOG_LEVEL
+        value: INFO

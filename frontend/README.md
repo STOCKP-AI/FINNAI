@@ -37,8 +37,13 @@ that fails on this dependency tree) and commit `package.json` and `package-lock.
 
 ## Configuration
 
-`VITE_API_BASE_URL` (in `.env.local`, or the build environment from Phase 6) is the only
-setting. Everything in a `VITE_` variable is shipped to every browser: never put a key there.
+`VITE_API_BASE_URL` (in `.env.local`; in Cloudflare Pages, the build's environment variables) is
+the only setting. Everything in a `VITE_` variable is shipped to every browser: never put a key there.
+
+`npm run build` also writes `dist/_headers` (Cloudflare Pages applies it): the security headers
+and a Content-Security-Policy whose `connect-src` is exactly the API address. `vite preview`
+sends the same headers, so the E2E tests run under the production policy. Deployment:
+[docs/deploy.md](../docs/deploy.md).
 
 ## How it is built
 
@@ -82,6 +87,8 @@ e2e/                 Playwright tests with the API mocked (page.route), so no ba
 | TC-AGT-09 | `Markdown.test.tsx`, `e2e/app.spec.ts` | AI text cannot inject HTML, run scripts or load images |
 | TC-AGT-11 | `e2e/app.spec.ts` | every answer is labelled as AI-generated |
 | SSE contract | `lib/chat.test.ts` | events in order, pings ignored, 429 / error event / cut-off stream reported |
-| TC-FE-07 | manual (Phase 6) | Lighthouse mobile: performance ≥ 85, accessibility ≥ 95, on the deployed site |
+| Chart bands | `lib/stretches.test.ts` | every day belongs to exactly one regime band (no band covers another regime's days) |
+| TC-SEC-05 | `e2e/app.spec.ts` | the production security headers and CSP are sent (`vite preview` uses the same values as `dist/_headers`) and nothing on the site breaks them |
+| TC-FE-07 | Actions → Lighthouse | Lighthouse mobile on the deployed site: performance ≥ 85, accessibility ≥ 95 (`scripts/lighthouse-check.mjs`) |
 
 Screenshots for review: `SCREENSHOTS=1 npm run test:e2e -- screenshots` (saved in `screenshots/`).

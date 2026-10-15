@@ -1,0 +1,61 @@
+# TC-FE-07: Lighthouse on the deployed website (mobile: performance >= 85, accessibility >= 95;
+# desktop is reported only). Actions -> Lighthouse -> Run workflow, with the site's address.
+# The API on Render's free plan sleeps after 15 minutes; the job wakes it first so the scores
+# measure the site, not a cold start.
+name: Lighthouse
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Website address, e.g. https://marketmood.pages.dev"
+        type: string
+        required: true
+      api_url:
+        description: "API address to wake first, e.g. https://marketmood-api.onrender.com (optional)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      URL: ${{ inputs.url }}
+      API_URL: ${{ inputs.api_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: "22"
+      - name: Wake the API
+        if: env.API_URL != ''
+        run: |
+          for _ in $(seq 1 24); do
+            if curl -fsS --max-time 10 "$API_URL/livez" > /dev/null; then echo "API is awake"; exit 0; fi
+            sleep 5
+          done
+          echo "::warning::The API did not answer within 2 minutes."
+      - name: Lighthouse (mobile and desktop)
+        run: |
+          mkdir -p lh
+          flags="--headless=new --no-sandbox"
+          npx --yes lighthouse@13.5.0 "$URL" --quiet --chrome-flags="$flags" \
+            --output=json --output=html --output-path=lh/mobile
+          npx --yes lighthouse@13.5.0 "$URL" --quiet --chrome-flags="$flags" --preset=desktop \
+            --output=json --output=html --output-path=lh/desktop
+      - name: Check the targets
+        run: |
+          node frontend/scripts/lighthouse-check.mjs lh/mobile.report.json mobile
+          node frontend/scripts/lighthouse-check.mjs lh/desktop.report.json desktop
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        if: always()
+        with:
+          name: lighthouse-reports
+          path: lh/
+          retention-days: 30

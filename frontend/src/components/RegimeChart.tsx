@@ -3,6 +3,7 @@ import {
   ColorType,
   CrosshairMode,
   LineSeries,
+  LineType,
   createChart,
   type IChartApi,
   type ISeriesApi,
@@ -12,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useRegimeHistory } from "../hooks/useRegime";
 import { formatDay, formatIndex, formatPct, REGIME_COLOR, REGIMES } from "../lib/format";
-import { regimeStretches } from "../lib/stretches";
+import { bandData, regimeStretches } from "../lib/stretches";
 import type { HistoryPoint, Range, Regime } from "../lib/types";
 import { ErrorCard, Skeleton } from "./States";
 
@@ -59,10 +60,14 @@ function PriceChart({ points }: { points: HistoryPoint[] }) {
       handleScale: false,
     });
     // Regime bands: one filled area per regime on a hidden 0-1 scale, so each stretch is a
-    // solid block behind the price line (a histogram leaves 1 px gaps between days).
+    // solid block behind the price line (a histogram leaves 1 px gaps between days). Days of
+    // other regimes get the value 0, not a gap: an area series joins the points on either side
+    // of a gap, which made one regime's band cover the stretches in between. Stepped lines make
+    // each block start and end exactly on the day the regime changes.
     const band = (r: Regime) =>
       chart.addSeries(AreaSeries, {
         priceScaleId: "bands",
+        lineType: LineType.WithSteps,
         lineVisible: false,
         topColor: alpha(REGIME_COLOR[r], 0.24),
         bottomColor: alpha(REGIME_COLOR[r], 0.24),
@@ -94,12 +99,7 @@ function PriceChart({ points }: { points: HistoryPoint[] }) {
   useEffect(() => {
     if (!bandsRef.current || !lineRef.current || !chartRef.current) return;
     for (const r of REGIMES) {
-      // A stretch also covers the first day of the next one, so neighbouring blocks touch.
-      bandsRef.current[r].setData(
-        points.map((p, i) =>
-          p.label === r || points[i - 1]?.label === r ? { time: p.date, value: 1 } : { time: p.date },
-        ),
-      );
+      bandsRef.current[r].setData(bandData(points, r));
     }
     lineRef.current.setData(points.map((p) => ({ time: p.date, value: p.close })));
     chartRef.current.timeScale().fitContent();
@@ -180,7 +180,7 @@ export function RegimeChart({ className = "" }: { className?: string }) {
 
       <div className={`mt-3 flex flex-1 flex-col transition-opacity ${isFetching && !isPending ? "opacity-60" : ""}`}>
         {isPending ? (
-          <Skeleton className="h-64" />
+          <Skeleton className="h-63 sm:h-71 lg:min-h-72 lg:flex-1" />
         ) : error ? (
           <ErrorCard error={error} onRetry={() => refetch()} title="Couldn't load the chart" />
         ) : data && data.points.length > 1 ? (

@@ -242,6 +242,15 @@ def test_eval_second_attempt_can_succeed(monkeypatch):
     assert "(answered by gpt-oss)" in evals.report(results, summary, "gemini", None)
 
 
+def test_eval_report_has_no_trailing_spaces():
+    case = {"id": "cur-3", "category": "current", "question": "Why?"}
+    answer = "**Current regime**  \nSideways  \n\n- signal one  "
+    results = [evals.Result(case, answer=answer, model="gemini")]
+    text = evals.report(results, evals.summarise(results, judged=False), "gemini", None)
+    assert "Sideways" in text and all(line == line.rstrip() for line in text.splitlines())
+    assert text.endswith("\n")
+
+
 def test_eval_bad_request_is_not_retried(monkeypatch):
     attempts = []
 

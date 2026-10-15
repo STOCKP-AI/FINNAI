@@ -25,15 +25,22 @@ def pepper(settings):
     return _fallback_pepper
 
 
-def client_ip(request, trust_proxy):
+def client_ip(request, trust_proxy, hops=1):
+    """The caller's IP address.
+
+    Behind a proxy (Render) the socket address is the proxy's, so the address comes from
+    X-Forwarded-For. Proxies append to that header and do not strip what the client sent, so
+    the first entries can be forged by anyone; only the last `hops` entries were added by
+    proxies we trust. The client is therefore the entry `hops` places from the end.
+    """
     if trust_proxy:
         forwarded = request.headers.get("x-forwarded-for", "")
-        first = forwarded.split(",")[0].strip()
-        if first:
-            return first
+        parts = [p.strip() for p in forwarded.split(",") if p.strip()]
+        if len(parts) >= hops:
+            return parts[-hops]
     return request.client.host if request.client else "unknown"
 
 
 def client_hash(request, settings):
-    ip = client_ip(request, settings.trust_proxy_headers)
+    ip = client_ip(request, settings.trust_proxy_headers, settings.proxy_hops)
     return hmac.new(pepper(settings), ip.encode(), hashlib.sha256).hexdigest()[:32]

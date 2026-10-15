@@ -82,3 +82,23 @@ test.describe("accessibility", () => {
     });
   }
 });
+
+test.describe("security headers", () => {
+  test("TC-SEC-05: the production Content-Security-Policy is sent and nothing breaks it", async ({ page }) => {
+    const violations: string[] = [];
+    page.on("console", (m) => {
+      if (/content security policy|refused to/i.test(m.text())) violations.push(m.text());
+    });
+    await mockApi(page);
+    const response = await page.goto("/");
+    const csp = response?.headers()["content-security-policy"] ?? "";
+    expect(csp).toContain("connect-src 'self' http://api.test");
+    expect(csp).not.toContain("*");
+    await expect(page.getByRole("heading", { name: "Sideways" })).toBeVisible();
+    await page.getByRole("button", { name: "Why is the model showing this regime?" }).click();
+    await expect(page.getByText("AI-generated · educational only").first()).toBeVisible();
+    await page.getByRole("link", { name: "How it works" }).click();
+    await expect(page.getByRole("heading", { name: "How MarketMood works" })).toBeVisible();
+    expect(violations).toEqual([]);
+  });
+});

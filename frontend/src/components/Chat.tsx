@@ -151,9 +151,15 @@ export function ChatThread({
 }) {
   const end = useRef<HTMLDivElement>(null);
   const last = messages[messages.length - 1];
+  // Follow the conversation only when it changes: scrolling on the first render jumped the page
+  // to the bottom on every visit (and counted as layout shift in Lighthouse).
+  const key = `${messages.length}:${last?.status ?? ""}`;
+  const shownKey = useRef(key);
   useEffect(() => {
+    if (shownKey.current === key) return;
+    shownKey.current = key;
     end.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
-  }, [messages.length, last?.status]);
+  }, [key]);
 
   return (
     <section className="outline-box p-4 sm:p-6" aria-labelledby="chat-title">

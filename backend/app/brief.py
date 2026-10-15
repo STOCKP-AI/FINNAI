@@ -4,6 +4,7 @@ Usage (after mm-nightly / mm-infer):
     uv run mm-brief             # AI brief, checked; template brief if the AI fails the checks
     uv run mm-brief --template  # template brief only (no AI call)
     uv run mm-brief --dry-run   # print, write nothing
+    uv run mm-brief --skip-if-done  # do nothing if the latest day already has an AI brief (retry run)
 
 The AI may only use the facts it is given: every number in its text must be one of them
 (within 0.1), no advice words, 30-90 words (SOA 5.7). Otherwise the template is stored and
@@ -79,6 +80,15 @@ def run(args):
         except PoolTimeout as exc:
             raise ApiError("MM-DB-001", "Could not connect to the database.") from exc
         rows = market.series()[0]["rows"]
+        day = rows[-1]["date"]
+        if args.skip_if_done:
+            with db.writer() as conn:
+                done = db.fetch_one(
+                    conn, "SELECT source FROM daily_briefs WHERE date = %s AND source = 'llm'", (day,)
+                )
+            if done:
+                log.info("The AI brief for %s is already written; nothing to do.", day)
+                return 0
         llm = None
         if not args.template:
             config = settings.llm()
@@ -87,7 +97,6 @@ def run(args):
             else:
                 llm = make_client(config, settings.llm_fallback())
         text, changed, source, model, _ = make_brief(rows, llm)
-        day = rows[-1]["date"]
         log.info("Brief for %s (%s):\n%s\nWhat changed: %s", day, source, text, changed)
         if args.dry_run:
             log.info("Dry run: nothing written.")
@@ -105,6 +114,9 @@ def main(argv=None):
     p = argparse.ArgumentParser(description="Write today's dashboard brief.")
     p.add_argument("--template", action="store_true", help="use the template only (no AI call)")
     p.add_argument("--dry-run", action="store_true", help="print the brief, write nothing")
+    p.add_argument(
+        "--skip-if-done", action="store_true", help="do nothing if the latest day already has an AI brief"
+    )
     args = p.parse_args(argv)
     try:
         return run(args)

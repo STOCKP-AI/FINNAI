@@ -89,7 +89,7 @@ export function useChat() {
             }));
           },
           onError: (err) => {
-            if (err.code === "MM-QUOTA-001") {
+            if (err.code === "MM-QUOTA-001" || err.code === "MM-QUOTA-003") {
               setLimitReached(err.message);
               setQuotaLeft(0);
             }

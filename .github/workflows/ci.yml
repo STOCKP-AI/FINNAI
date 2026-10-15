@@ -1,6 +1,7 @@
 # Runs on every pull request and on every push to main.
 # lint: ruff + lockfile check. test: migrations on a fresh Postgres 17, then all Python tests.
 # frontend: ESLint, TypeScript, Vitest, then Playwright E2E + axe against the built site (API mocked).
+# image: builds the API's Docker image (as Render does) and checks it starts and answers /livez.
 name: CI
 
 on:
@@ -17,7 +18,7 @@ concurrency:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -36,7 +37,7 @@ jobs:
         run: uv run ruff format --check .
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
       postgres:
@@ -91,8 +92,35 @@ jobs:
       - name: Backend tests, coverage >= 80%
         run: uv run pytest backend/tests --cov=app --cov-report=term-missing --cov-fail-under=80
 
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the API image (backend/Dockerfile, context = repository root)
+        run: docker build -f backend/Dockerfile -t marketmood-api:ci .
+      - name: The container starts, runs as a non-root user and answers /livez
+        run: |
+          docker run -d --name api -p 10000:10000 -e LLM_PROVIDER=mock marketmood-api:ci
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:10000/livez; then break; fi
+            sleep 1
+          done
+          echo
+          curl -fsS http://localhost:10000/livez > /dev/null
+          test "$(docker exec api id -u)" = "10001"
+          # No database configured: data endpoints must fail cleanly (503 MM-DB-001), not crash.
+          code=$(curl -s -o body.json -w "%{http_code}" http://localhost:10000/v1/regime/today)
+          cat body.json; echo
+          test "$code" = "503" && grep -q "MM-DB-001" body.json
+      - name: Container log
+        if: always()
+        run: docker logs api || true
+
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     defaults:
       run:
