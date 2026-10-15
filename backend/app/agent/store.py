@@ -90,34 +90,52 @@ def save_feedback(session_id, client_hash, message_id, rating):
             raise ApiError("MM-REQ-003", "That answer was not found in this conversation.")
 
 
-def take_quota(client_hash, limit, day=None):
-    """Atomically count one chat; return chats left today, or raise MM-QUOTA-001 (429)."""
+GLOBAL_KEY = "*all*"  # usage_daily row counting every visitor's AI answers (site-wide cap)
+
+
+def take_quota(client_hash, limit, day=None, global_limit=None):
+    """Atomically count one chat; return chats left today for this visitor.
+
+    Raises MM-QUOTA-001 (429) when the visitor has used `limit` chats today, and MM-QUOTA-003
+    (503) when all visitors together have used `global_limit`. Both counters change in one
+    transaction, so a refused chat counts nowhere.
+    """
     day = day or ist_today()
     with db.writer() as conn, conn.cursor() as cur:
-        cur.execute(
-            "INSERT INTO usage_daily (client_hash, day, chats) VALUES (%s, %s, 0) ON CONFLICT DO NOTHING",
-            (client_hash, day),
-        )
+        for key in (client_hash, GLOBAL_KEY) if global_limit else (client_hash,):
+            cur.execute(
+                "INSERT INTO usage_daily (client_hash, day, chats) VALUES (%s, %s, 0) ON CONFLICT DO NOTHING",
+                (key, day),
+            )
         cur.execute(
             "UPDATE usage_daily SET chats = chats + 1 WHERE client_hash = %s AND day = %s AND chats < %s "
             "RETURNING chats",
             (client_hash, day, limit),
         )
         row = cur.fetchone()
-    if row is None:
-        raise ApiError(
-            "MM-QUOTA-001", f"You have used today's {limit} chats. The limit resets at midnight IST."
-        )
+        if row is None:
+            raise ApiError(
+                "MM-QUOTA-001", f"You have used today's {limit} chats. The limit resets at midnight IST."
+            )
+        if global_limit:
+            cur.execute(
+                "UPDATE usage_daily SET chats = chats + 1 WHERE client_hash = %s AND day = %s AND chats < %s "
+                "RETURNING chats",
+                (GLOBAL_KEY, day, global_limit),
+            )
+            if cur.fetchone() is None:
+                raise ApiError("MM-QUOTA-003")  # rolls back the visitor's increment too
     return limit - row[0]
 
 
 def refund_quota(client_hash, day=None):
-    """Give the chat back when the AI failed (SOA 5.6)."""
+    """Give the chat back when the AI failed (SOA 5.6), to the visitor and to the site-wide count."""
     day = day or ist_today()
     with db.writer() as conn, conn.cursor() as cur:
         cur.execute(
-            "UPDATE usage_daily SET chats = greatest(chats - 1, 0) WHERE client_hash = %s AND day = %s",
-            (client_hash, day),
+            "UPDATE usage_daily SET chats = greatest(chats - 1, 0) "
+            "WHERE client_hash IN (%s, %s) AND day = %s",
+            (client_hash, GLOBAL_KEY, day),
         )
 
 

@@ -1,0 +1,10 @@
+# Only the API needs to be in the image build context (see backend/Dockerfile).
+**
+!pyproject.toml
+!uv.lock
+!ml/pyproject.toml
+!backend/pyproject.toml
+!backend/app/**
+**/__pycache__
+**/*.pyc
+**/.env

@@ -14,3 +14,8 @@ export function regimeStretches(points: HistoryPoint[]) {
   });
   return out;
 }
+
+/** One chart band's data: 1 on the regime's days and 0 on every other day, never a gap. */
+export function bandData(points: HistoryPoint[], regime: Regime) {
+  return points.map((p) => ({ time: p.date, value: p.label === regime ? 1 : 0 }));
+}

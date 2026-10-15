@@ -1,0 +1,75 @@
+# Gate G3: run the AI analyst on the golden questions (backend/app/evals/golden.yaml) against the
+# live Supabase data, have a second model judge the answers, and keep the report as an artifact.
+# Actions -> AI evaluation -> Run workflow. Takes about 15 minutes (30 s between questions keeps
+# the free Gemini / Groq limits). To publish the result, download docs-evals and commit evals.md
+# to docs/ in a pull request.
+#
+# Repository secrets: DATABASE_URL, LLM_API_KEY (Gemini), LLM_FALLBACK_API_KEY (Groq),
+# JUDGE_API_KEY (Groq; may be the same key as LLM_FALLBACK_API_KEY).
+name: AI evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Question ids to run, separated by spaces (empty = all)"
+        type: string
+        default: ""
+      delay:
+        description: "Seconds between questions"
+        type: string
+        default: "30"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-evaluation
+  cancel-in-progress: false
+
+jobs:
+  evals:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      LLM_PROVIDER: gemini
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_FALLBACK_PROVIDER: groq
+      LLM_FALLBACK_API_KEY: ${{ secrets.LLM_FALLBACK_API_KEY }}
+      JUDGE_PROVIDER: groq
+      JUDGE_API_KEY: ${{ secrets.JUDGE_API_KEY }}
+      JUDGE_MODEL: qwen/qwen3.8-27b
+      ONLY: ${{ inputs.only }}
+      DELAY: ${{ inputs.delay }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.23"
+      - name: Install (with the dev group, because the eval runner reads YAML)
+        run: uv sync --all-packages --locked
+      - name: Check the secrets
+        run: |
+          for name in DATABASE_URL LLM_API_KEY JUDGE_API_KEY; do
+            if [ -z "${!name}" ]; then echo "::error::Repository secret $name is not set."; exit 1; fi
+          done
+      - name: Run the golden questions
+        run: |
+          args=(--delay "$DELAY")
+          if [ -n "$ONLY" ]; then read -ra ids <<< "$ONLY"; args+=(--only "${ids[@]}"); fi
+          uv run --no-sync mm-evals "${args[@]}"
+      - name: Summary
+        if: always()
+        run: |
+          if [ -f docs/evals.md ]; then
+            sed -n '/^- Run:/,/^$/p' docs/evals.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        if: always()
+        with:
+          name: docs-evals
+          path: docs/evals.md
+          retention-days: 30

@@ -146,13 +146,34 @@ def test_client_hash_is_stable_hmac_never_the_ip(monkeypatch):
     assert h == client_mod.client_hash(Req("1.2.3.4"), s) and "1.2.3.4" not in h and len(h) == 32
     assert h != client_mod.client_hash(Req("1.2.3.5"), s)
     proxied = make_settings(trust_proxy_headers=True)
-    assert client_mod.client_ip(Req("10.0.0.1", "9.9.9.9, 10.0.0.1"), True) == "9.9.9.9"
     assert client_mod.client_hash(Req("10.0.0.1", "9.9.9.9"), proxied) != client_mod.client_hash(
         Req("10.0.0.1"), proxied
     )
     monkeypatch.setattr(client_mod, "_fallback_pepper", None)
     no_pepper = make_settings(ip_hash_pepper=None)
     assert client_mod.pepper(no_pepper) == client_mod.pepper(no_pepper)  # random but fixed per process
+
+
+def test_client_ip_ignores_forged_forwarded_entries():
+    """TC-SEC-03: a forged X-Forwarded-For entry does not change who the caller is."""
+
+    class Req:
+        def __init__(self, ip, fwd=None):
+            self.client = type("C", (), {"host": ip})()
+            self.headers = {"x-forwarded-for": fwd} if fwd else {}
+
+    ip = client_mod.client_ip
+    assert ip(Req("10.0.0.1", "9.9.9.9"), False) == "10.0.0.1"  # header ignored unless trusted
+    assert ip(Req("10.0.0.1", "9.9.9.9"), True) == "9.9.9.9"
+    # A visitor sends a fake X-Forwarded-For; the proxy appends the real address after it.
+    assert ip(Req("10.0.0.1", "6.6.6.6, 9.9.9.9"), True) == "9.9.9.9"
+    assert ip(Req("10.0.0.1", " 6.6.6.6 ,9.9.9.9, 172.70.1.2"), True, hops=2) == "9.9.9.9"
+    assert ip(Req("10.0.0.1", "9.9.9.9"), True, hops=2) == "10.0.0.1"  # too few entries: socket address
+    assert ip(Req("10.0.0.1", ""), True) == "10.0.0.1"
+    proxied = make_settings(trust_proxy_headers=True)
+    assert client_mod.client_hash(Req("10.0.0.1", "1.1.1.1, 9.9.9.9"), proxied) == client_mod.client_hash(
+        Req("10.0.0.1", "2.2.2.2, 9.9.9.9"), proxied
+    )  # forging the first entry does not give a new identity (a fresh chat quota)
 
 
 def test_docs_can_be_disabled():

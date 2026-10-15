@@ -306,7 +306,9 @@ def report(results, summary, model, judge_model):
         safe, _, replaced = guard.check(r.answer)
         note = " *(the output guard would replace this answer)*" if replaced else ""
         lines += [f"**{r.case['id']}. {r.case['question']}**{note}", "", f"> {r.answer or r.error}", ""]
-    return "\n".join(lines) + "\n"
+    # Model answers often end lines with spaces (Markdown line breaks); strip them so the report
+    # passes the trailing-whitespace check in pre-commit.
+    return "\n".join(line.rstrip() for line in "\n".join(lines).splitlines()) + "\n"
 
 
 def _verdict(summary):

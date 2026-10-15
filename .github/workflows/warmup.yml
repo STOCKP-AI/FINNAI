@@ -1,0 +1,40 @@
+# Before a demo: wake the API on Render (the free instance sleeps after 15 minutes) and fill
+# today's answer cache for the suggested questions, so they answer instantly on stage.
+# Actions -> Demo warm-up -> Run workflow, with the API address. Uses up to 5 AI answers of the
+# site-wide daily limit; questions already cached today cost nothing.
+name: Demo warm-up
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: "API address, e.g. https://marketmood-api.onrender.com"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  warm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      API_URL: ${{ inputs.api_url }}
+    steps:
+      - name: Wake the API
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -fsS --max-time 10 "$API_URL/readyz"; then echo; exit 0; fi
+            sleep 5
+          done
+          echo "::error::The API is not ready after 2.5 minutes (check Render's Logs tab)."
+          exit 1
+      - name: Cache the suggested questions
+        run: |
+          for chip in today why history after_crisis vix; do
+            last=$(curl -sS -N --max-time 90 -X POST "$API_URL/v1/chat" \
+              -H "Content-Type: application/json" \
+              -d "{\"message\": \"warm-up\", \"chip_id\": \"$chip\"}" | grep '^data:' | tail -n 1)
+            echo "$chip: ${last:0:160}"
+          done

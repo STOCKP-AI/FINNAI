@@ -229,6 +229,35 @@ def test_quota_limit_and_refund(seeded):
     assert r.status_code == 429 and r.json()["error"]["code"] == "MM-QUOTA-001"
 
 
+def test_site_wide_daily_cap(seeded):
+    """TC-QUO-04 (prototype form): all visitors together stop at chat_global_daily_limit (MM-QUOTA-003).
+
+    A refused chat counts nowhere, and a refund gives the chat back to the site-wide count too.
+    """
+    c, _ = seeded
+    settings = make_settings(
+        database_url=TEST_URL, chat_daily_limit=5, chat_global_daily_limit=2, trust_proxy_headers=True
+    )
+    from app.core.config import get_settings
+
+    c.app.dependency_overrides[get_settings] = lambda: settings
+
+    def ask(ip):
+        return c.post("/v1/chat", json={"message": "hi"}, headers={"x-forwarded-for": ip})
+
+    assert sse_events(ask("1.1.1.1").text)[-1][1]["quota_left"] == 4
+    assert sse_events(ask("2.2.2.2").text)[-1][1]["quota_left"] == 4
+    r = ask("3.3.3.3")
+    assert r.status_code == 503 and r.json()["error"]["code"] == "MM-QUOTA-003"
+    with store.db.writer() as conn:
+        rows = dict(conn.execute("SELECT client_hash, chats FROM usage_daily").fetchall())
+    visitors = {k: v for k, v in rows.items() if k != store.GLOBAL_KEY}
+    assert rows[store.GLOBAL_KEY] == 2 and sorted(visitors.values()) == [1, 1]  # visitor 3 not counted
+    store.refund_quota(next(iter(visitors)))
+    assert ask("3.3.3.3").status_code == 200
+    c.app.dependency_overrides.clear()
+
+
 def test_chip_answers_are_cached_and_free(seeded):
     c, _ = seeded
     first = sse_events(c.post("/v1/chat", json={"message": "x", "chip_id": "today"}).text)
@@ -361,6 +390,19 @@ def test_brief_cli_writes(seeded, monkeypatch):
     with db.writer() as conn:
         row = db.fetch_one(conn, "SELECT source FROM daily_briefs")
     assert row["source"] == "template"
+    # The 23:07 retry run: a template brief is replaced (the AI may work now) ...
+    db.close_pool()
+    assert brief.main(["--template", "--skip-if-done"]) == 0
+    # ... but an AI brief that is already there is kept, with no new AI call.
+    db.open_pool(settings).wait(timeout=10)
+    with db.writer() as conn, conn.cursor() as cur:
+        cur.execute("UPDATE daily_briefs SET source = 'llm', brief = 'kept'")
+    db.close_pool()
+    monkeypatch.setattr(brief, "make_brief", lambda *a: (_ for _ in ()).throw(AssertionError("called")))
+    assert brief.main(["--skip-if-done"]) == 0
+    db.open_pool(settings).wait(timeout=10)
+    with db.writer() as conn:
+        assert db.fetch_one(conn, "SELECT brief FROM daily_briefs")["brief"] == "kept"
 
 
 def test_evals_with_the_mock_model(seeded, tmp_path):

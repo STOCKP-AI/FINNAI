@@ -19,6 +19,7 @@ The regime samples below are real responses from the 8 Oct 2026 data (lists shor
 | 413 | MM-REQ-002 | body over 16 KB (chat) or 1 KB (anything else) |
 | 422 | MM-REQ-001 | invalid parameter or body (also unknown fields) |
 | 429 | MM-QUOTA-001 | 10 chats per visitor per day used (resets at midnight IST) |
+| 503 | MM-QUOTA-003 | the site-wide daily limit of AI answers is used (all visitors together; resets at midnight IST) |
 | 503 | MM-DB-001 / MM-CFG-001 | database unreachable / AI not configured |
 
 Show `request_id` in error messages ("Reference: …"); every response also has an

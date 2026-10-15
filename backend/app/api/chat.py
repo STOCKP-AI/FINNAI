@@ -107,7 +107,9 @@ async def chat(body: ChatRequest, request: Request, settings=Depends(get_setting
             message_id = await run_in_threadpool(store.save_exchange, session_id, question, final, final.text)
             return _stream(_cached_events(cached, session_id, message_id))
 
-    quota_left = await run_in_threadpool(store.take_quota, who, settings.chat_daily_limit)
+    quota_left = await run_in_threadpool(
+        store.take_quota, who, settings.chat_daily_limit, None, settings.chat_global_daily_limit
+    )
     history = await run_in_threadpool(store.history, session_id)
     system = analyst_prompt(store.ist_today().isoformat())
     agent = Orchestrator(llm, settings)

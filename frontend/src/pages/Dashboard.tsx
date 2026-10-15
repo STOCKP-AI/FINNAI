@@ -50,10 +50,11 @@ export function Dashboard() {
         ) : (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_1px_minmax(17rem,22rem)]">
             <div className="order-2 flex flex-col gap-4 lg:order-1">
-              <Suspense fallback={<Skeleton className="h-80 lg:flex-1" />}>
+              {/* Skeletons match the loaded sizes, so nothing jumps when the data arrives (CLS). */}
+              <Suspense fallback={<Skeleton className="h-[26rem] lg:flex-1" />}>
                 <RegimeChart className="lg:flex-1" />
               </Suspense>
-              {today.data ? <StatTiles data={today.data} /> : <Skeleton className="h-24" />}
+              {today.data ? <StatTiles data={today.data} /> : <Skeleton className="h-48 sm:h-24" />}
             </div>
             <div className="hidden bg-white/10 lg:order-2 lg:block" aria-hidden="true" />
             <div className="order-1 space-y-4 lg:order-3">
@@ -64,8 +65,8 @@ export function Dashboard() {
                 </>
               ) : (
                 <>
-                  <Skeleton className="h-64" />
-                  <Skeleton className="h-72" />
+                  <Skeleton className="h-[21rem]" />
+                  <Skeleton className="h-[30rem]" />
                 </>
               )}
             </div>

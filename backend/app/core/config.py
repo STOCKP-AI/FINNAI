@@ -77,7 +77,11 @@ class Settings(BaseSettings):
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
     ip_hash_pepper: SecretStr | None = None
     chat_daily_limit: int = Field(10, ge=1, le=1000)
+    # Site-wide cap on AI answers per IST day (all visitors together), so a shared link cannot
+    # use up the free Gemini / Groq quota. Cached chip answers do not count.
+    chat_global_daily_limit: int = Field(300, ge=1, le=100_000)
     trust_proxy_headers: bool = False  # true only behind a proxy that sets X-Forwarded-For (Render)
+    proxy_hops: int = Field(1, ge=1, le=5)  # X-Forwarded-For entries appended by trusted proxies
     docs_enabled: bool = True
     nse_holidays: Annotated[list[date], NoDecode] = []
 

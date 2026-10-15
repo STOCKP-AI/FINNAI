@@ -1,20 +1,31 @@
-# Runs the data pipeline against Supabase on demand: Actions -> Data pipeline -> Run workflow.
-# First run after Phase 2.5: mode = full (reloads 10 years, fills the 17 missing days and
-# everything since 29 Jun 2026), then features are recomputed.
-# Needs the repository secret DATABASE_URL (Session pooler connection string).
-# The nightly schedule (19:30 IST + 23:00 retry) is added in Phase 6.
+# The nightly job: new NIFTY 50 + India VIX prices -> features -> regime labels -> daily brief.
+# Runs on weekdays at 19:37 IST (data final after 16:00 IST) and again at 23:07 IST in case
+# Yahoo Finance was late. Every step is idempotent, so the second run changes nothing when the
+# first one worked; on NSE holidays the pipeline finds no new day and exits normally.
+# Manual run: Actions -> Data pipeline -> Run workflow (incremental, full reload, or dry run).
+#
+# Repository secrets (Settings -> Secrets and variables -> Actions):
+#   DATABASE_URL          Supabase Session pooler connection string (required)
+#   LLM_API_KEY           Google AI Studio key for the AI-written brief (optional)
+#   LLM_FALLBACK_API_KEY  Groq key, used when Gemini is busy (optional)
+# Without the AI keys the brief is written from the template.
+# GitHub e-mails the person who last changed the schedule when a scheduled run fails, and turns
+# schedules off after 60 days without commits (re-enable them in the Actions tab).
 name: Data pipeline
 
 on:
+  schedule:
+    - cron: "7 14 * * 1-5"   # 19:37 IST, Monday to Friday
+    - cron: "37 17 * * 1-5"  # 23:07 IST retry
   workflow_dispatch:
     inputs:
       mode:
-        description: "incremental = last stored date - 5 days to today; full = last 10 years"
+        description: "incremental = last stored date - 5 days to today; full = reload the last 10 years"
         type: choice
         options: [incremental, full]
         default: incremental
       dry_run:
-        description: "Download and check only; write nothing"
+        description: "Download and compute only; write nothing"
         type: boolean
         default: false
 
@@ -27,11 +38,12 @@ concurrency:
 
 jobs:
   run:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      MODE: ${{ inputs.mode }}
-      DRY_RUN: ${{ inputs.dry_run }}
+      MODE: ${{ inputs.mode || 'incremental' }}
+      DRY_RUN: ${{ inputs.dry_run || false }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -39,29 +51,54 @@ jobs:
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
         with:
           version: "0.12.23"
-      - name: Install (ML package only)
-        run: uv sync --package marketmood-ml --locked --no-dev
+      - name: Install (pipeline and API packages, no dev tools)
+        run: uv sync --all-packages --locked --no-dev
       - name: Check the connection
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: uv run --no-sync mm-check-db
-      - name: Ingest NIFTY 50 + India VIX
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          args=()
-          [ "$MODE" = "full" ] && args+=(--full)
-          [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
-          uv run --no-sync mm-ingest "${args[@]}"
-      - name: Recompute features
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Repository secret DATABASE_URL is not set (Settings -> Secrets and variables -> Actions)."
+            exit 1
+          fi
+          uv run --no-sync mm-check-db
+
+      - name: Nightly pipeline (ingest -> features -> regime labels)
+        if: env.MODE == 'incremental'
         run: |
           args=()
           [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
+          uv run --no-sync mm-nightly "${args[@]}"
+      - name: Full reload (10 years), then features and regime labels
+        if: env.MODE == 'full'
+        run: |
+          args=()
+          [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
+          uv run --no-sync mm-ingest --full "${args[@]}"
           uv run --no-sync mm-features "${args[@]}"
+          uv run --no-sync mm-infer "${args[@]}"
+
+      - name: Daily brief (AI, number-checked; template if the AI fails or has no key)
+        env:
+          LLM_PROVIDER: gemini
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_FALLBACK_PROVIDER: groq
+          LLM_FALLBACK_API_KEY: ${{ secrets.LLM_FALLBACK_API_KEY }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          args=()
+          [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
+          [ -z "$LLM_API_KEY" ] && args+=(--template)
+          [ -z "$LLM_FALLBACK_API_KEY" ] && unset LLM_FALLBACK_PROVIDER
+          # Scheduled runs keep an AI brief that is already written (the 23:07 retry costs no AI call).
+          [ "$EVENT" = "schedule" ] && args+=(--skip-if-done)
+          uv run --no-sync mm-brief "${args[@]}"
+
       - name: Row counts after the run
         if: always()
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: uv run --no-sync mm-check-db
+        run: |
+          uv run --no-sync mm-check-db 2>&1 | tee counts.txt
+          {
+            echo "### Data pipeline ($MODE, dry run: $DRY_RUN)"
+            echo '```'
+            grep -E "rows, latest|active model" counts.txt | sed 's/.*check_connection: //'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

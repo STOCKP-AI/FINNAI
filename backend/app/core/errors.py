@@ -21,6 +21,10 @@ CODES = {
     "MM-REQ-002": (413, "The request body is too large."),
     "MM-REQ-003": (404, "Not found."),
     "MM-QUOTA-001": (429, "Daily chat limit reached. Try again tomorrow."),
+    "MM-QUOTA-003": (  # site-wide daily AI budget (SOA: spend cap)
+        503,
+        "The AI analyst has answered as many questions as it can today. Try again tomorrow.",
+    ),
     "MM-DB-001": (503, "The database is not reachable right now."),
     "MM-DB-002": (504, "The database took too long to answer."),
     "MM-DATA-001": (200, "Serving the last available regime; today's data is not in yet."),
