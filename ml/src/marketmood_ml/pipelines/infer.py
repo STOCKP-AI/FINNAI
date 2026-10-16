@@ -111,8 +111,12 @@ def infer(url, dry_run=False):
         model = load_model(resolve_artifact(active["artifact_path"]), active["checksums"])
         log.info("Active model %s (%s); checksums verified.", model.version, active["status"])
         frame = load_frame(conn)
+        if len(frame) == 0:
+            raise PipelineError(
+                MM_DATA_002, "the features table is empty; run mm-features (or mm-nightly) first"
+            )
         out = predict_history(model, frame)
-        errors = validate_output(out)
+        errors = validate_output(out) if len(out) else ["no rows could be labelled"]
         if errors:
             raise PipelineError(
                 MM_DATA_002, "regime output check failed, nothing written: " + "; ".join(errors)

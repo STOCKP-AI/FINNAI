@@ -26,7 +26,8 @@ VALUES (%(version)s, %(status)s, %(train_start)s, %(train_end)s, %(data_end)s, %
 ON CONFLICT (version) DO UPDATE SET
     status = EXCLUDED.status,
     metrics = EXCLUDED.metrics,
-    is_active = EXCLUDED.is_active
+    -- --no-activate means "do not make it active", never "switch the live model off"
+    is_active = model_registry.is_active OR EXCLUDED.is_active
 WHERE model_registry.checksums = EXCLUDED.checksums
 RETURNING version;
 """
@@ -64,9 +65,25 @@ def registry_params(model, checksums, artifact_path, status, activate):
 
 
 def register(conn, model, checksums, artifact_path, status, activate=True):
-    """Insert (or re-activate) a model version. A version can never change its files."""
+    """Insert (or re-activate) a model version. A version can never change its files.
+
+    Re-registering never switches the live model off: without `activate` the version keeps
+    whatever is_active it had. A retired model cannot be active, so retiring the live model is
+    refused until another version has been activated.
+    """
     params = registry_params(model, checksums, artifact_path, status, activate)
+    if status == "retired" and activate:
+        raise PipelineError(MM_MODEL_004, "a retired model cannot be the active model")
     with conn.cursor() as cur:
+        if status == "retired":
+            cur.execute("SELECT is_active FROM model_registry WHERE version = %s", (model.version,))
+            row = cur.fetchone()
+            if row and row[0]:
+                raise PipelineError(
+                    MM_MODEL_004,
+                    f"{model.version} is the active model; register and activate another version "
+                    "before retiring it",
+                )
         if activate:
             cur.execute(DEACTIVATE_SQL, (model.version,))
         cur.execute(REGISTER_SQL, params)

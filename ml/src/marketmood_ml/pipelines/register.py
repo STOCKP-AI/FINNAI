@@ -42,7 +42,11 @@ def run(args):
         raise PipelineError(MM_MODEL_001, f"no model folder at {args.folder}")
     checksums = {name: sha256_file(folder / name) for name in MODEL_FILES if (folder / name).is_file()}
     model = load_model(folder, checksums)
-    status = args.status or ("validated" if model.metrics.get("passed") else "experimental")
+    # metrics.json is not checksummed, so it can never promote a model on its own: "validated"
+    # must be asked for explicitly (after reading docs/validation.md); the default is experimental.
+    status = args.status or "experimental"
+    if args.status is None and model.metrics.get("passed"):
+        log.warning("metrics.json says the gates passed; use --status validated to record that.")
     url = load_settings()
     with db_connection(url) as conn:
         register(conn, model, checksums, artifact_path(folder), status, activate=not args.no_activate)
@@ -52,7 +56,7 @@ def run(args):
 def main(argv=None):
     p = argparse.ArgumentParser(description="Register a saved model folder in model_registry.")
     p.add_argument("folder", help="e.g. ml/models/hmm-20261008-c2")
-    p.add_argument("--status", choices=STATUSES, help="default: from metrics.json (validated/experimental)")
+    p.add_argument("--status", choices=STATUSES, help="default: experimental (metrics.json is not trusted)")
     p.add_argument("--no-activate", action="store_true", help="register without making it active")
     args = p.parse_args(argv)
     try:

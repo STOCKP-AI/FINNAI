@@ -139,7 +139,10 @@ def normalise(raw, ticker):
         index = index.tz_localize(None)
     out = df[OHLCV].copy()
     out.insert(0, "date", index.normalize())
-    return out.reset_index(drop=True).sort_values("date").drop_duplicates("date", keep="last")
+    # mergesort is stable: of two rows with the same date, the later one (the newest download) stays
+    return (
+        out.reset_index(drop=True).sort_values("date", kind="mergesort").drop_duplicates("date", keep="last")
+    )
 
 
 # ---------------------------------------------------------------------------- combine
