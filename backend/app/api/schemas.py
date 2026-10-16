@@ -4,7 +4,7 @@ from datetime import date
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Label = Literal["Bull", "Sideways", "Crisis"]
 ChipId = Literal["today", "why", "history", "after_crisis", "vix"]
@@ -104,6 +104,14 @@ class ChatRequest(BaseModel):
     session_id: UUID | None = Field(None, description="Omit to start a new conversation")
     message: str = Field(min_length=1, max_length=2000)
     chip_id: ChipId | None = Field(None, description="A suggestion chip; its fixed question is used")
+
+    @model_validator(mode="after")
+    def _clean_message(self):
+        # PostgreSQL text cannot hold NUL characters, and a blank question has nothing to answer.
+        self.message = self.message.replace("\x00", "").strip()
+        if not self.message and self.chip_id is None:
+            raise ValueError("message must not be blank")
+        return self
 
 
 class FeedbackRequest(BaseModel):

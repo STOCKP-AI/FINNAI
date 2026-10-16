@@ -130,6 +130,27 @@ class OpenAICompatClient:
             ) from exc
         except openai.APIConnectionError as exc:
             raise LLMError("MM-LLM-003", f"{self.provider}: connection failed", retryable=True) from exc
+        except openai.APIError as exc:
+            # An error object inside an HTTP 200 stream ({"error": {...}}): the SDK raises the base
+            # APIError. Treat "overloaded" / 429 / 5xx like a busy provider so we retry or fall back.
+            busy = _looks_busy(exc)
+            raise LLMError(
+                "MM-LLM-002" if busy else "MM-LLM-003",
+                f"{self.provider}: error in stream{_detail(exc)}",
+                retry_after_s=_retry_after(exc),
+                retryable=busy,
+            ) from exc
+
+
+def _looks_busy(exc):
+    body = getattr(exc, "body", None)
+    code = body.get("code") if isinstance(body, dict) else None
+    if str(code) in ("429", "500", "502", "503", "504", "529"):
+        return True
+    text = f"{body} {exc}".lower()
+    return any(
+        w in text for w in ("overloaded", "rate limit", "unavailable", "resource_exhausted", "try again")
+    )
 
 
 def _retry_after(exc):
