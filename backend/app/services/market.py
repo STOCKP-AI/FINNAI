@@ -177,13 +177,25 @@ def days_in_regime(labels):
     return n
 
 
-def downsample(rows, max_points=MAX_POINTS):
-    """Evenly spaced rows, always keeping the first and the last."""
+def downsample(rows, max_points=MAX_POINTS, key="confirmed_label"):
+    """At most `max_points` rows: the first, the last, both ends of every regime stretch, and
+    evenly spaced rows in between. Keeping the ends means a short stretch (a few days of Crisis)
+    never disappears from the long-range chart."""
     if len(rows) <= max_points:
         return list(rows)
-    step = (len(rows) - 1) / (max_points - 1)
-    idx = sorted({round(k * step) for k in range(max_points)})
-    return [rows[i] for i in idx]
+    label = [r.get(key) if isinstance(r, dict) else None for r in rows]
+    keep = {0, len(rows) - 1}
+    for i in range(1, len(rows)):
+        if label[i] != label[i - 1]:
+            keep.update((i - 1, i))
+    if len(keep) >= max_points:  # more changes than points: thin the change points evenly
+        idx = sorted(keep)
+        step = (len(idx) - 1) / (max_points - 1)
+        return [rows[idx[round(k * step)]] for k in range(max_points)]
+    spare = max_points - len(keep)
+    step = (len(rows) - 1) / (spare + 1)
+    keep.update(round(k * step) for k in range(1, spare + 1))
+    return [rows[i] for i in sorted(keep)]
 
 
 def episodes(rows):

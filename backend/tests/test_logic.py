@@ -44,6 +44,20 @@ def test_days_in_regime_and_downsample():
     assert market.downsample(rows[:10], 500) == rows[:10]
 
 
+def test_downsample_keeps_short_regime_stretches():
+    labels = ["Bull"] * 1000 + ["Crisis"] * 3 + ["Bull"] * 997
+    rows = [{"date": i, "confirmed_label": lab} for i, lab in enumerate(labels)]
+    small = market.downsample(rows, 100)
+    assert len(small) <= 100 and small[0] is rows[0] and small[-1] is rows[-1]
+    assert [r["date"] for r in small] == sorted(r["date"] for r in small)
+    crisis = [r["date"] for r in small if r["confirmed_label"] == "Crisis"]
+    assert crisis == [1000, 1002]  # both ends of the 3-day stretch survive
+    # more regime changes than points: still at most max_points, first and last kept
+    flip = [{"date": i, "confirmed_label": "Bull" if i % 2 else "Crisis"} for i in range(1000)]
+    thin = market.downsample(flip, 50)
+    assert len(thin) == 50 and thin[0] is flip[0] and thin[-1] is flip[-1]
+
+
 def test_episodes_and_drawdown():
     labels = ["Bull"] * 3 + ["Crisis"] * 3 + ["Bull"] * 2
     closes = [100, 110, 120, 120, 90, 108, 110, 115]

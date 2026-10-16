@@ -84,11 +84,20 @@ def _connection():
 
 @contextmanager
 def reader():
-    """Read-only transaction as agent_reader."""
+    """Read-only transaction as agent_reader.
+
+    All SQL run here is fixed text with parameters, but as a second line of defence the role is
+    checked again at the end: if anything ran RESET ROLE / SET ROLE inside the block, the results
+    are not returned.
+    """
     with _connection() as conn, conn.transaction():
         conn.execute("SET TRANSACTION READ ONLY")
         conn.execute("SET LOCAL ROLE agent_reader")
         yield conn
+        role = conn.execute("SELECT current_user").fetchone()[0]
+        if role != "agent_reader":
+            log.error("Read-only role changed to %s inside a reader block", role)
+            raise ApiError("MM-INT-001")
 
 
 @contextmanager
