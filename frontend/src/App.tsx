@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router";
 
+import { ErrorBoundary, LoadFailed } from "./components/ErrorBoundary";
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./pages/Dashboard";
 import { NotFound } from "./pages/NotFound";
@@ -15,9 +16,11 @@ export function App() {
         <Route
           path="/how-it-works"
           element={
-            <Suspense fallback={<p className="pt-10 text-center text-ink-3">Loading…</p>}>
-              <HowItWorks />
-            </Suspense>
+            <ErrorBoundary fallback={(error) => <LoadFailed error={error} what="this page" />}>
+              <Suspense fallback={<p className="pt-10 text-center text-ink-3">Loading…</p>}>
+                <HowItWorks />
+              </Suspense>
+            </ErrorBoundary>
           }
         />
         <Route path="*" element={<NotFound />} />

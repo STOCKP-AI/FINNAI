@@ -10,12 +10,27 @@ export const formatIndex = (n: number) => inr.format(n);
 /** -1.64 -> "−1.64%", 0.5 -> "+0.50%" (a real minus sign, so it reads well and is not hyphenated). */
 export function formatPct(n: number | null | undefined, digits = 2): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "—";
-  const sign = n > 0 ? "+" : n < 0 ? "−" : "";
-  return `${sign}${Math.abs(n).toFixed(digits)}%`;
+  const r = Number(n.toFixed(digits)); // sign of what is shown: -0.001 is "0.00%", not "−0.00%"
+  const sign = r > 0 ? "+" : r < 0 ? "−" : "";
+  return `${sign}${Math.abs(r).toFixed(digits)}%`;
 }
 
-/** 0.9972 -> "99.7%". */
-export const formatProb = (p: number) => `${(p * 100).toFixed(p >= 0.995 || p <= 0.005 ? 1 : 0)}%`;
+/** Sign of a change as shown with `digits` decimals: "up", "down" or "flat". */
+export function direction(n: number, digits = 2): "up" | "down" | "flat" {
+  const r = Number(n.toFixed(digits));
+  return r > 0 ? "up" : r < 0 ? "down" : "flat";
+}
+
+/** 0.9972 -> "99.7%", 0.42 -> "42%". Near-certain values never round up to "100.0%" (or down to
+ *  "0.0%") unless they really are 1 (or 0). */
+export function formatProb(p: number): string {
+  if (p >= 0.995 || p <= 0.005) {
+    const tenths = p >= 0.995 ? Math.floor(p * 1000) : Math.ceil(p * 1000);
+    const shown = p > 0 && p < 1 ? Math.min(999, Math.max(1, tenths)) : tenths;
+    return `${(shown / 10).toFixed(1)}%`;
+  }
+  return `${Math.min(99, Math.max(1, Math.round(p * 100)))}%`;
+}
 
 /** "2026-10-08" -> "8 Oct 2026" (dates from the API are trading days, no time zone). */
 export const formatDay = (iso: string) => day.format(new Date(`${iso}T00:00:00Z`));

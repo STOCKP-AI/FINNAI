@@ -1,4 +1,4 @@
-import { formatIndex, formatPct } from "../lib/format";
+import { direction, formatIndex, formatPct } from "../lib/format";
 import type { RegimeToday } from "../lib/types";
 
 function Tile({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "up" | "down" }) {
@@ -19,7 +19,12 @@ function Tile({ label, value, sub, tone }: { label: string; value: string; sub?:
   );
 }
 
-const tone = (n: number | null) => (n === null ? undefined : n >= 0 ? "up" : "down");
+// A flat day (0.00% as shown) is neither green nor red.
+const tone = (n: number | null) => {
+  if (n === null) return undefined;
+  const d = direction(n);
+  return d === "flat" ? undefined : d;
+};
 
 /** DASH-05: four headline numbers - hero stats, not a chart (dataviz: a single value is a tile). */
 export function StatTiles({ data }: { data: RegimeToday }) {

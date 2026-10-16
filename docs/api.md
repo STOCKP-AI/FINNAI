@@ -90,7 +90,12 @@ conversation. Keep the `session_id` from the `done` event and send it with the n
 ```
 
 Suggestion chips (`chip_id`, the server uses the fixed question; answers are cached for the
-day and do not count against the limit): `today`, `why`, `history`, `after_crisis`, `vix`.
+day and do not count against the 10-chat limit): `today`, `why`, `history`, `after_crisis`, `vix`.
+A chip answer is generated without the visitor's earlier messages, because it is cached and shown
+to everyone. Cached answers have their own, looser limit (50 per visitor per day,
+`CHAT_CACHED_DAILY_LIMIT`; `429 MM-QUOTA-001` after that).
+
+`message` must contain more than spaces (`422 MM-REQ-001`); NUL characters are removed.
 
 Response: `Content-Type: text/event-stream`. Events, in order (numbers in this example are illustrative):
 
@@ -115,10 +120,12 @@ data: {"message_id": 812, "session_id": "8a0f3c2e-…", "usage": {"in": 2140, "o
 - Always show `done.label` ("AI-generated · educational only") under AI messages (TC-AGT-11).
 - Render AI text as Markdown **without images and without raw HTML** (TC-AGT-09).
 - `event: error` → `{"code": "MM-LLM-002", "message": "The AI analyst is busy - try again in a minute.", "session_id": "…"}`.
-  The chat is not counted against the limit when the AI fails.
+  It can also arrive after some `token` events (the provider failed mid-answer, or the answer
+  could not be stored: `MM-DB-001`). The chat is not counted against the limit when that happens.
 - Lines starting with `:` (`: ping`, every 15 s) are keep-alives: ignore them. A stream ends
   after 90 s at most.
-- Before the stream starts, failures are normal JSON errors (429, 422, 503).
+- Before the stream starts, failures are normal JSON errors (429, 422, 503). A refused request
+  (429) writes nothing to the database.
 
 ## POST /v1/feedback
 
