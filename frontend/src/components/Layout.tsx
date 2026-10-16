@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { Link, NavLink } from "react-router";
+import { useEffect, type ReactNode } from "react";
+import { Link, NavLink, useLocation } from "react-router";
 
 import { useRegimeToday } from "../hooks/useRegime";
 import { formatDayShort } from "../lib/format";
@@ -51,12 +51,35 @@ export function StatusPill() {
   );
 }
 
+/** A new page starts at its top, or at the section named in the link (e.g. #accuracy). The
+ *  section may be in a page that is still loading, so look for it for a moment. */
+function ScrollManager() {
+  const { pathname, hash } = useLocation();
+  useEffect(() => {
+    if (!hash) {
+      window.scrollTo(0, 0);
+      return;
+    }
+    let tries = 0;
+    const timer = setInterval(() => {
+      const el = document.getElementById(decodeURIComponent(hash.slice(1)));
+      if (el || ++tries > 40) {
+        clearInterval(timer);
+        el?.scrollIntoView({ block: "start" });
+      }
+    }, 50);
+    return () => clearInterval(timer);
+  }, [pathname, hash]);
+  return null;
+}
+
 const navClass = ({ isActive }: { isActive: boolean }) =>
   `rounded-lg px-3 py-1.5 text-sm transition ${isActive ? "bg-white/10 text-ink" : "text-ink-2 hover:text-ink"}`;
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col">
+      <ScrollManager />
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-panel focus:px-4 focus:py-2"

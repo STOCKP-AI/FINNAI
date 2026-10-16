@@ -2,10 +2,11 @@ import { lazy, Suspense, useEffect, useRef } from "react";
 
 import { BriefPanel } from "../components/BriefPanel";
 import { AskBar, ChatThread, SuggestionChips } from "../components/Chat";
+import { ErrorBoundary, LoadFailed } from "../components/ErrorBoundary";
 import { RegimeCard } from "../components/RegimeCard";
 import { ErrorCard, Skeleton, StaleBanner, WakingUp } from "../components/States";
 import { StatTiles } from "../components/StatTiles";
-import { useChat } from "../hooks/useChat";
+import { useChatContext } from "../hooks/chatContext";
 import { useRegimeToday, useSlow } from "../hooks/useRegime";
 import type { ChipId } from "../lib/types";
 
@@ -15,7 +16,7 @@ const RegimeChart = lazy(() => import("../components/RegimeChart").then((m) => (
 export function Dashboard() {
   const today = useRegimeToday();
   const slow = useSlow(today.isPending);
-  const chat = useChat();
+  const chat = useChatContext();
   const threadRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -50,9 +51,11 @@ export function Dashboard() {
         ) : (
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_1px_minmax(17rem,22rem)]">
             <div className="order-2 flex flex-col gap-4 lg:order-1">
-              <Suspense fallback={<Skeleton className="h-80 lg:flex-1" />}>
-                <RegimeChart className="lg:flex-1" />
-              </Suspense>
+              <ErrorBoundary fallback={(error) => <LoadFailed error={error} what="the chart" />}>
+                <Suspense fallback={<Skeleton className="h-80 lg:flex-1" />}>
+                  <RegimeChart className="lg:flex-1" />
+                </Suspense>
+              </ErrorBoundary>
               {today.data ? <StatTiles data={today.data} /> : <Skeleton className="h-24" />}
             </div>
             <div className="hidden bg-white/10 lg:order-2 lg:block" aria-hidden="true" />

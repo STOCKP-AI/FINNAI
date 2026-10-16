@@ -1,12 +1,14 @@
-import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 
 import type { ChatMessage } from "../hooks/useChat";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { SUGGESTIONS } from "../lib/suggestions";
 import type { ChipId } from "../lib/types";
 
 // Markdown rendering (react-markdown + GFM) is loaded with the first answer.
 const Markdown = lazy(() => import("./Markdown").then((m) => ({ default: m.Markdown })));
 
+const AI_LABEL = "AI-generated · educational only";
 
 /** The ask bar at the bottom of the main card. Enter sends; while answering it becomes Stop. */
 export function AskBar({
@@ -21,6 +23,12 @@ export function AskBar({
   disabled?: boolean;
 }) {
   const [text, setText] = useState("");
+  // Stop appears exactly where Ask was: the second click of a double-click on Ask (detail 2)
+  // lands on it and must not cancel the question that was just sent.
+  const stop = (e: MouseEvent<HTMLButtonElement>) => {
+    if (e.detail > 1) return;
+    onStop();
+  };
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (busy || disabled || !text.trim()) return;
@@ -44,14 +52,16 @@ export function AskBar({
       />
       {busy ? (
         <button
+          key="stop"
           type="button"
-          onClick={onStop}
+          onClick={stop}
           className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-ink hover:bg-white/15"
         >
           Stop
         </button>
       ) : (
         <button
+          key="ask"
           type="submit"
           disabled={disabled || !text.trim()}
           className="rounded-lg bg-gradient-to-r from-indigo-500 to-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-[0_0_20px_-4px_rgb(99_102_241)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
@@ -106,9 +116,11 @@ function AssistantMessage({ m, onRate }: { m: ChatMessage; onRate: (r: "up" | "d
         </p>
       )}
       {m.text && (
-        <Suspense fallback={<p className="prose-ai whitespace-pre-wrap">{m.text}</p>}>
-          <Markdown text={m.text} />
-        </Suspense>
+        <ErrorBoundary fallback={() => <p className="prose-ai whitespace-pre-wrap">{m.text}</p>}>
+          <Suspense fallback={<p className="prose-ai whitespace-pre-wrap">{m.text}</p>}>
+            <Markdown text={m.text} />
+          </Suspense>
+        </ErrorBoundary>
       )}
       {m.status === "stopped" && <p className="mt-1 text-xs text-ink-3">Stopped.</p>}
       {m.status === "error" && m.error && (
@@ -120,10 +132,10 @@ function AssistantMessage({ m, onRate }: { m: ChatMessage; onRate: (r: "up" | "d
           </p>
         </div>
       )}
-      {m.status === "done" && (
+      {(m.status === "done" || (m.text && m.status !== "streaming")) && (
         <div className="mt-1.5 flex items-center gap-2">
-          <span className="text-[0.7rem] text-ink-3">{m.label ?? "AI-generated · educational only"}</span>
-          {m.messageId !== undefined && (
+          <span className="text-[0.7rem] text-ink-3">{m.label ?? AI_LABEL}</span>
+          {m.status === "done" && m.messageId !== undefined && (
             <span className="flex">
               <Thumb up pressed={m.rating === "up"} onClick={() => onRate("up")} />
               <Thumb up={false} pressed={m.rating === "down"} onClick={() => onRate("down")} />
