@@ -10,6 +10,11 @@ Events (FPD 14):
     error {"code", "message", "session_id"}
 A comment line ": ping" is sent every 15 s; a stream is capped at 90 s (SOA 5.6).
 Before the stream starts, failures are normal JSON errors (429 quota, 422, 503).
+
+Order of work, so that a refused or failed request costs nothing: the daily limit is checked
+before anything is written; a chat counted against the limit is given back if anything fails
+before the answer is stored. Suggestion-chip answers are generated without the visitor's own
+conversation, because they are cached and shown to everyone.
 """
 
 import asyncio
@@ -94,25 +99,34 @@ async def chat(body: ChatRequest, request: Request, settings=Depends(get_setting
         raise ApiError("MM-CFG-001", "The AI analyst is not configured yet.")
     llm = _llm_override or make_client(llm_config, settings.llm_fallback())
     who = client_hash(request, settings)
-    question = CHIPS[body.chip_id] if body.chip_id else body.message.strip()
-    session_id = await run_in_threadpool(store.ensure_session, body.session_id, who)
+    question = CHIPS[body.chip_id] if body.chip_id else body.message
+    day = store.ist_today()  # the day the request is counted on (and refunded to)
 
     regime_key = None
     if body.chip_id:
         latest = (await run_in_threadpool(market.series))[0]["rows"][-1]
         regime_key = (latest["confirmed_label"], latest["date"])
-        cached = await run_in_threadpool(store.cached_answer, body.chip_id, *regime_key)
+        cached = await run_in_threadpool(store.cached_answer, body.chip_id, *regime_key, day)
         if cached:
+            await run_in_threadpool(store.take_cached, who, settings.chat_cached_daily_limit, day)
+            session_id = await run_in_threadpool(store.ensure_session, body.session_id, who)
             final = Final(text=cached["answer"], model=cached["model"])
             message_id = await run_in_threadpool(store.save_exchange, session_id, question, final, final.text)
             return _stream(_cached_events(cached, session_id, message_id))
 
-    quota_left = await run_in_threadpool(store.take_quota, who, settings.chat_daily_limit)
-    history = await run_in_threadpool(store.history, session_id)
-    system = analyst_prompt(store.ist_today().isoformat())
+    quota_left = await run_in_threadpool(store.take_quota, who, settings.chat_daily_limit, day)
+    try:
+        session_id = await run_in_threadpool(store.ensure_session, body.session_id, who)
+        # A chip answer is cached for everyone: never let one visitor's conversation shape it.
+        history = [] if body.chip_id else await run_in_threadpool(store.history, session_id)
+    except Exception:
+        await _refund(who, day)
+        raise
+    system = analyst_prompt(day.isoformat())
     agent = Orchestrator(llm, settings)
     events = agent.run(system, history, question)
-    return _stream(_agent_events(events, who, session_id, question, quota_left, body.chip_id, regime_key))
+    ctx = _Ctx(who, day, session_id, question, quota_left, body.chip_id, regime_key)
+    return _stream(_agent_events(events, ctx))
 
 
 @router.post(
@@ -126,6 +140,26 @@ async def feedback(body: FeedbackRequest, request: Request, settings=Depends(get
     rating = 1 if body.rating == "up" else -1
     await run_in_threadpool(store.save_feedback, body.session_id, who, body.message_id, rating)
     return Response(status_code=204)
+
+
+class _Ctx:
+    def __init__(self, who, day, session_id, question, quota_left, chip_id, regime_key):
+        self.who, self.day, self.session_id, self.question = who, day, session_id, question
+        self.quota_left, self.chip_id, self.regime_key = quota_left, chip_id, regime_key
+
+
+async def _refund(who, day):
+    """Give a counted chat back; never raise (we may already be streaming)."""
+    try:
+        await run_in_threadpool(store.refund_quota, who, day)
+    except Exception as exc:  # the database may be the reason we are refunding
+        log.warning("Could not refund the chat (%s): %s", who[:8], exc)
+
+
+def _error_event(code, session_id):
+    return sse(
+        "error", {"code": code, "message": CODES.get(code, (0, "Error"))[1], "session_id": str(session_id)}
+    )
 
 
 def _stream(generator):
@@ -154,7 +188,8 @@ async def _cached_events(cached, session_id, message_id):
     )
 
 
-async def _agent_events(events, who, session_id, question, quota_left, chip_id, regime_key):
+async def _agent_events(events, ctx):
+    session_id = ctx.session_id
     final = None
     try:
         async with asyncio.timeout(STREAM_LIMIT_S):
@@ -172,25 +207,41 @@ async def _agent_events(events, who, session_id, question, quota_left, chip_id, 
     except (LLMError, TimeoutError, ApiError) as exc:
         code = getattr(exc, "code", "MM-LLM-001")
         log.warning("%s during chat (session %s): %s", code, session_id, exc)
-        await run_in_threadpool(store.refund_quota, who)
-        yield sse(
-            "error",
-            {"code": code, "message": CODES.get(code, (0, "Error"))[1], "session_id": str(session_id)},
-        )
+        await _refund(ctx.who, ctx.day)
+        yield _error_event(code, session_id)
+        return
+    except Exception:
+        log.exception("Unexpected error during chat (session %s)", session_id)
+        await _refund(ctx.who, ctx.day)
+        yield _error_event("MM-INT-001", session_id)
+        return
+    if final is None:  # the model stream ended without a result
+        await _refund(ctx.who, ctx.day)
+        yield _error_event("MM-LLM-003", session_id)
         return
 
-    answer, guard_warnings, replaced = guard.check(final.text)
-    final.warnings += guard_warnings
-    message_id = await run_in_threadpool(store.save_exchange, session_id, question, final, answer)
-    if chip_id and not final.warnings and regime_key:
-        await run_in_threadpool(store.cache_answer, chip_id, *regime_key, final, answer)
+    try:
+        answer, guard_warnings, replaced = guard.check(final.text)
+        final.warnings += guard_warnings
+        message_id = await run_in_threadpool(store.save_exchange, session_id, ctx.question, final, answer)
+    except Exception as exc:
+        code = exc.code if isinstance(exc, ApiError) else "MM-INT-001"
+        log.warning("%s while storing the answer (session %s): %s", code, session_id, exc)
+        await _refund(ctx.who, ctx.day)
+        yield _error_event(code, session_id)
+        return
+    if ctx.chip_id and not final.warnings and ctx.regime_key:
+        try:  # the answer is stored; caching it for others is only an optimisation
+            await run_in_threadpool(store.cache_answer, ctx.chip_id, *ctx.regime_key, final, answer, ctx.day)
+        except Exception as exc:
+            log.warning("Could not cache the %s answer: %s", ctx.chip_id, exc)
     yield sse(
         "done",
         {
             "message_id": message_id,
             "session_id": str(session_id),
             "usage": {"in": final.tokens_in, "out": final.tokens_out},
-            "quota_left": quota_left,
+            "quota_left": ctx.quota_left,
             "warnings": final.warnings,
             "replace_text": answer if replaced else None,
             "label": AI_LABEL,

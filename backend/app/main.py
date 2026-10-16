@@ -49,6 +49,9 @@ def create_app(settings=None, open_db=True):
     app.include_router(health.router)
     app.include_router(regime.router)
     app.include_router(chat.router)
+    # Starlette runs the middleware added last first: CORS wraps everything, including the
+    # 413 and 500 answers that ApiMiddleware sends itself.
+    app.add_middleware(ApiMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,  # exact origins only, never a wildcard
@@ -58,7 +61,6 @@ def create_app(settings=None, open_db=True):
         expose_headers=["X-Request-ID"],
         max_age=600,
     )
-    app.add_middleware(ApiMiddleware)
     return app
 
 

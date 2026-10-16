@@ -6,9 +6,12 @@ Content-Length does not help; at 16 KB at most, buffering them costs nothing.
 """
 
 import json
+import logging
 
 from app.core.errors import error_body
 from app.core.request_context import new_request_id
+
+log = logging.getLogger("api")
 
 CHAT_PATH = "/v1/chat"
 CHAT_LIMIT = 16 * 1024
@@ -59,8 +62,12 @@ class ApiMiddleware:
         else:
             app_receive = receive
 
+        started = False
+
         async def send_with_headers(message):
+            nonlocal started
             if message["type"] == "http.response.start":
+                started = True
                 extra = [
                     (b"x-request-id", rid.encode()),
                     (b"x-content-type-options", b"nosniff"),
@@ -69,19 +76,32 @@ class ApiMiddleware:
                 message = {**message, "headers": [*message.get("headers", []), *extra]}
             await send(message)
 
-        await self.app(scope, app_receive, send_with_headers)
+        try:
+            await self.app(scope, app_receive, send_with_headers)
+        except Exception:
+            # Answer unexpected errors here, inside CORS and with the request id, instead of letting
+            # Starlette's outermost handler send a bare 500 the browser cannot read.
+            if started:
+                raise
+            log.exception("Unhandled error (request %s)", rid)
+            await _send_json(send, rid, 500, error_body("MM-INT-001", "Something went wrong on our side."))
 
 
 async def _send_413(send, rid):
-    body = json.dumps(error_body("MM-REQ-002", "The request body is too large.")).encode()
+    await _send_json(send, rid, 413, error_body("MM-REQ-002", "The request body is too large."))
+
+
+async def _send_json(send, rid, status, payload):
+    body = json.dumps(payload).encode()
     await send(
         {
             "type": "http.response.start",
-            "status": 413,
+            "status": status,
             "headers": [
                 (b"content-type", b"application/json"),
                 (b"content-length", str(len(body)).encode()),
                 (b"x-request-id", rid.encode()),
+                (b"x-content-type-options", b"nosniff"),
             ],
         }
     )

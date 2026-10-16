@@ -77,6 +77,7 @@ class Settings(BaseSettings):
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
     ip_hash_pepper: SecretStr | None = None
     chat_daily_limit: int = Field(10, ge=1, le=1000)
+    chat_cached_daily_limit: int = Field(50, ge=1, le=10000)  # cached suggestion answers per visitor
     trust_proxy_headers: bool = False  # true only behind a proxy that sets X-Forwarded-For (Render)
     docs_enabled: bool = True
     nse_holidays: Annotated[list[date], NoDecode] = []
