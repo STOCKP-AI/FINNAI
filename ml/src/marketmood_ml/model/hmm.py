@@ -97,8 +97,12 @@ def fit_best_hmm(x_train, config):
         model.fit(x_train)
         ll = float(model.score(x_train))
         logliks[seed] = ll
+        if not np.isfinite(ll):  # a degenerate fit; never let it win (NaN compares False)
+            continue
         if best is None or ll > best[2]:
             best = (model, seed, ll)
+    if best is None:
+        raise ValueError(f"every seed gave a non-finite log-likelihood: {logliks}")
     model, seed, ll = best
     return HmmParams.from_hmmlearn(model), seed, ll, logliks
 

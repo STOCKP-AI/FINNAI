@@ -5,6 +5,7 @@ Postgres access uses psycopg 3 (the same driver as the backend).
 
 import logging
 import os
+import re
 import sys
 from contextlib import contextmanager
 from urllib.parse import urlparse
@@ -78,16 +79,25 @@ def load_settings():
 
 
 def describe_database_url(url):
-    """Return a safe description of the connection (never includes the password)."""
+    """Return a safe description of the connection (never the password, nor the project id).
+
+    Logs of GitHub Actions in a public repository are public, so the Supabase project ref
+    (in the pooler user name "postgres.<ref>" and the direct host "db.<ref>.supabase.co") is
+    masked too.
+    """
     parsed = urlparse(url)
     host = parsed.hostname or "?"
+    user = parsed.username or "?"
+    if "." in user:
+        user = user.split(".", 1)[0] + ".***"
+    shown_host = re.sub(r"^db\.[^.]+\.supabase\.co$", "db.***.supabase.co", host)
     if "pooler.supabase.com" in host:
         kind = "Supabase pooler (" + ("session" if parsed.port == 5432 else "transaction") + " mode)"
     elif host.startswith("db.") and host.endswith(".supabase.co"):
         kind = "Supabase direct connection (IPv6 only; GitHub Actions cannot use it)"
     else:
         kind = "non-Supabase host"
-    return f"{kind} host={host} port={parsed.port} user={parsed.username} db={parsed.path.lstrip('/')}"
+    return f"{kind} host={shown_host} port={parsed.port} user={user} db={parsed.path.lstrip('/')}"
 
 
 def is_database_error(exc):
@@ -107,9 +117,13 @@ def db_connection(url):
     import psycopg
 
     conn = psycopg.connect(url, connect_timeout=15, prepare_threshold=None)
-    # Supabase's server default extra_float_digits = 0 sends floats with 15 significant digits;
-    # 3 sends them exactly, so a value read back is the value written.
-    conn.execute("SET extra_float_digits = 3")
+    try:
+        # Supabase's server default extra_float_digits = 0 sends floats with 15 significant digits;
+        # 3 sends them exactly, so a value read back is the value written.
+        conn.execute("SET extra_float_digits = 3")
+    except Exception:
+        conn.close()
+        raise
     try:
         yield conn
         conn.commit()

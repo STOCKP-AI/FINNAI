@@ -14,6 +14,7 @@ the checksums are the same on every laptop.
 
 import hashlib
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -22,6 +23,8 @@ import numpy as np
 
 from marketmood_ml.common import MM_MODEL_001, MM_MODEL_004, PipelineError
 from marketmood_ml.model.hmm import HmmParams, Scaler
+
+log = logging.getLogger("artifacts")
 
 MODEL_FILES = ("model.json", "surrogate.txt")
 FORMAT_VERSION = 1
@@ -161,13 +164,23 @@ def load_model(directory, expected_checksums):
                 f"checksum mismatch for {path} (expected {expected_checksums[name][:12]}..., "
                 f"got {actual[:12]}...); refusing to run",
             )
-    metrics_path = folder / "metrics.json"
-    metrics = json.loads(metrics_path.read_text(encoding="utf-8")) if metrics_path.is_file() else {}
     return TrainedModel.from_files(
         (folder / "model.json").read_text(encoding="utf-8"),
         (folder / "surrogate.txt").read_text(encoding="utf-8"),
-        metrics,
+        read_metrics(folder),
     )
+
+
+def read_metrics(folder):
+    """metrics.json is informational and NOT covered by the registry checksums, so a broken or
+    edited file must neither stop the model nor decide anything (see mm-register --status)."""
+    path = Path(folder) / "metrics.json"
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    except (OSError, ValueError) as exc:
+        log.warning("Ignoring unreadable %s: %s", path, exc)
+        return {}
+    return doc if isinstance(doc, dict) else {}
 
 
 def _write_text(path, text):
