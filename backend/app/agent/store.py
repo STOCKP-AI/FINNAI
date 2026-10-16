@@ -19,6 +19,11 @@ def ist_today():
     return datetime.now(IST).date()
 
 
+def _text(value):
+    """PostgreSQL text cannot contain NUL characters; a model or a user could send one."""
+    return value.replace("\x00", "") if isinstance(value, str) else value
+
+
 def ensure_session(session_id, client_hash):
     """Reuse the session only if it exists and belongs to this client; otherwise start a new one."""
     with db.writer() as conn, conn.cursor() as cur:
@@ -52,7 +57,7 @@ def save_exchange(session_id, question, final, answer):
     with db.writer() as conn, conn.cursor() as cur:
         cur.execute(
             "INSERT INTO chat_messages (session_id, role, content) VALUES (%s, 'user', %s)",
-            (session_id, question),
+            (session_id, _text(question)),
         )
         cur.execute(
             "INSERT INTO chat_messages "
@@ -60,7 +65,7 @@ def save_exchange(session_id, question, final, answer):
             "VALUES (%s, 'assistant', %s, %s, %s, %s, %s, %s) RETURNING id",
             (
                 session_id,
-                answer,
+                _text(answer),
                 Jsonb(tools),
                 Jsonb(final.warnings),
                 final.model,
@@ -90,29 +95,44 @@ def save_feedback(session_id, client_hash, message_id, rating):
             raise ApiError("MM-REQ-003", "That answer was not found in this conversation.")
 
 
-def take_quota(client_hash, limit, day=None):
-    """Atomically count one chat; return chats left today, or raise MM-QUOTA-001 (429)."""
-    day = day or ist_today()
+def _take(column, client_hash, limit, day):
+    """Atomically add one to a usage_daily counter below `limit`; return the new value or None."""
+    assert column in ("chats", "cached")
     with db.writer() as conn, conn.cursor() as cur:
         cur.execute(
-            "INSERT INTO usage_daily (client_hash, day, chats) VALUES (%s, %s, 0) ON CONFLICT DO NOTHING",
+            "INSERT INTO usage_daily (client_hash, day) VALUES (%s, %s) ON CONFLICT DO NOTHING",
             (client_hash, day),
         )
         cur.execute(
-            "UPDATE usage_daily SET chats = chats + 1 WHERE client_hash = %s AND day = %s AND chats < %s "
-            "RETURNING chats",
+            f"UPDATE usage_daily SET {column} = {column} + 1 "  # noqa: S608 - column is one of two names
+            f"WHERE client_hash = %s AND day = %s AND {column} < %s RETURNING {column}",
             (client_hash, day, limit),
         )
         row = cur.fetchone()
-    if row is None:
+    return None if row is None else row[0]
+
+
+def take_quota(client_hash, limit, day=None):
+    """Atomically count one chat; return chats left today, or raise MM-QUOTA-001 (429)."""
+    used = _take("chats", client_hash, limit, day or ist_today())
+    if used is None:
         raise ApiError(
             "MM-QUOTA-001", f"You have used today's {limit} chats. The limit resets at midnight IST."
         )
-    return limit - row[0]
+    return limit - used
+
+
+def take_cached(client_hash, limit, day=None):
+    """Count one cached suggestion answer (looser cap, so they cannot be used to fill the database)."""
+    if _take("cached", client_hash, limit, day or ist_today()) is None:
+        raise ApiError(
+            "MM-QUOTA-001",
+            f"You have used today's {limit} suggested answers. The limit resets at midnight IST.",
+        )
 
 
 def refund_quota(client_hash, day=None):
-    """Give the chat back when the AI failed (SOA 5.6)."""
+    """Give the chat back when the AI failed (SOA 5.6). `day` is the day the chat was counted."""
     day = day or ist_today()
     with db.writer() as conn, conn.cursor() as cur:
         cur.execute(
@@ -142,5 +162,5 @@ def cache_answer(chip_id, regime, as_of, final, answer, day=None):
             "ON CONFLICT (day, chip_id, regime) DO UPDATE SET as_of = EXCLUDED.as_of, "
             "answer = EXCLUDED.answer, "
             "tools = EXCLUDED.tools, model = EXCLUDED.model, created_at = now()",
-            (day, chip_id, regime, as_of, answer, Jsonb(tools), final.model),
+            (day, chip_id, regime, as_of, _text(answer), Jsonb(tools), final.model),
         )
