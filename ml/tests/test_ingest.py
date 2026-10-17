@@ -282,10 +282,13 @@ class TestConnectionDescription(unittest.TestCase):
         text = describe_database_url(FAKE_URL)
         self.assertNotIn("s3cret-pw", text)
         self.assertIn("pooler (session mode)", text)
+        self.assertNotIn("abc", text.split("user=")[1])  # the project ref is masked (public CI logs)
+        self.assertIn("user=postgres.***", text)
 
     def test_detects_direct_connection(self):
         text = describe_database_url("postgresql://postgres:pw@db.abcd.supabase.co:5432/postgres")
         self.assertIn("direct connection", text)
+        self.assertNotIn("abcd", text)
 
 
 if __name__ == "__main__":

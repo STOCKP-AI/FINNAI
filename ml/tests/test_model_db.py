@@ -210,6 +210,12 @@ def test_register_cli_registers_a_saved_folder(released, tmp_path, caplog):
     with db_connection(TEST_URL) as conn:
         active = registry.get_active(conn)
     assert active["version"] == "hmm-test-c" and active["status"] == "experimental"
+    caplog.set_level("ERROR", logger="register")
+    # retiring the live model is refused (it would leave no active model) ...
+    assert register.main([str(other), "--status", "retired", "--no-activate"]) == 1
+    assert "active model" in caplog.text
+    # ... until another version is active
+    assert register.main([str(folder)]) == 0  # hmm-test-a again
     assert register.main([str(other), "--status", "retired", "--no-activate"]) == 0
     assert count(TEST_URL, "SELECT status FROM model_registry WHERE version = 'hmm-test-c'") == "retired"
     caplog.set_level("ERROR", logger="register")
@@ -246,3 +252,34 @@ def test_record_run_never_raises(caplog):
     caplog.set_level("WARNING", logger="registry")
     registry.record_run("postgresql://nobody:wrong@127.0.0.1:1/none", "infer", None, "success")
     assert "Could not record" in caplog.text
+
+
+# ---------------------------------------------------------------- bug scan, 15 Oct 2026
+def test_metrics_json_cannot_promote_a_model(released, tmp_path):
+    model, _, _, _ = released
+    model.version, model.metrics = "hmm-test-metrics", {"passed": True}
+    folder = tmp_path / model.version
+    artifacts.save_model(model, folder)
+    assert register.main([str(folder), "--no-activate"]) == 0
+    assert (
+        count(TEST_URL, "SELECT status FROM model_registry WHERE version = 'hmm-test-metrics'")
+        == "experimental"
+    )
+
+
+def test_reregistering_without_activate_keeps_the_live_model(released):
+    _, folder, _, _ = released  # hmm-test-a, active
+    assert register.main([str(folder), "--no-activate"]) == 0
+    with db_connection(TEST_URL) as conn:
+        assert registry.get_active(conn)["version"] == "hmm-test-a"
+
+
+def test_infer_on_an_empty_features_table_says_so(released, caplog):
+    with db_connection(TEST_URL) as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM regime_output")
+        cur.execute("DELETE FROM features")
+    with pytest.raises(PipelineError) as ctx:
+        infer.infer(TEST_URL)
+    assert ctx.value.code == "MM-DATA-002" and "features table is empty" in str(ctx.value)
+    caplog.set_level("ERROR", logger="infer")
+    assert infer.main([]) == 1  # a clear error, not a crash (exit 2)
